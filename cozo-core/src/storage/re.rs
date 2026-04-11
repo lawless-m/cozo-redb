@@ -139,18 +139,10 @@ impl<'s> StoreTx<'s> for RedbTx {
         match self {
             RedbTx::Read(_) => bail!("write in read transaction"),
             RedbTx::Write(Some(tx)) => {
-                let table = tx.open_table(TABLE).into_diagnostic()?;
-                let keys: Vec<Vec<u8>> = table
-                    .range::<&[u8]>(lower..upper)
-                    .into_diagnostic()?
-                    .map(|r| r.map(|(k, _)| k.value().to_vec()))
-                    .collect::<std::result::Result<_, _>>()
-                    .into_diagnostic()?;
-                drop(table);
                 let mut table = tx.open_table(TABLE).into_diagnostic()?;
-                for k in keys {
-                    table.remove(k.as_slice()).into_diagnostic()?;
-                }
+                table
+                    .retain_in::<&[u8], _>(lower..upper, |_, _| false)
+                    .into_diagnostic()?;
                 Ok(())
             }
             RedbTx::Write(None) => bail!("transaction already committed"),
@@ -192,7 +184,42 @@ impl<'s> StoreTx<'s> for RedbTx {
     where
         's: 'a,
     {
-        Box::new(self.collect_range(lower, upper).into_iter())
+        match self {
+            RedbTx::Read(tx) => {
+                let table = match tx.open_table(TABLE) {
+                    Ok(t) => t,
+                    Err(e) => return Box::new(std::iter::once(Err(miette::miette!("{e}")))),
+                };
+                let iter = match table.range::<&[u8]>(lower..upper) {
+                    Ok(i) => i,
+                    Err(e) => return Box::new(std::iter::once(Err(miette::miette!("{e}")))),
+                };
+                // ReadOnlyTable::range returns Range<'static> — safe to stream
+                Box::new(iter.map(|r| match r {
+                    Ok(entry) => Ok((entry.0.value().to_vec(), entry.1.value().to_vec())),
+                    Err(e) => Err(miette::miette!("{e}")),
+                }))
+            }
+            RedbTx::Write(Some(tx)) => {
+                let table = match tx.open_table(TABLE) {
+                    Ok(t) => t,
+                    Err(e) => return Box::new(std::iter::once(Err(miette::miette!("{e}")))),
+                };
+                let collected: Vec<_> = table
+                    .range::<&[u8]>(lower..upper)
+                    .into_iter()
+                    .flatten()
+                    .map(|r| match r {
+                        Ok(entry) => Ok((entry.0.value().to_vec(), entry.1.value().to_vec())),
+                        Err(e) => Err(miette::miette!("{e}")),
+                    })
+                    .collect();
+                Box::new(collected.into_iter())
+            }
+            RedbTx::Write(None) => {
+                Box::new(std::iter::once(Err(miette::miette!("transaction already committed"))))
+            }
+        }
     }
 
     fn range_skip_scan_tuple<'a>(
@@ -236,43 +263,6 @@ impl<'s> StoreTx<'s> for RedbTx {
 }
 
 impl RedbTx {
-    fn collect_range(&self, lower: &[u8], upper: &[u8]) -> Vec<Result<(Vec<u8>, Vec<u8>)>> {
-        
-        match self {
-            RedbTx::Read(tx) => {
-                let table = match tx.open_table(TABLE) {
-                    Ok(t) => t,
-                    Err(e) => return vec![Err(miette::miette!("{e}"))],
-                };
-                let iter = match table.range::<&[u8]>(lower..upper) {
-                    Ok(i) => i,
-                    Err(e) => return vec![Err(miette::miette!("{e}"))],
-                };
-                iter.map(|r| match r {
-                    Ok(entry) => Ok((entry.0.value().to_vec(), entry.1.value().to_vec())),
-                    Err(e) => Err(miette::miette!("{e}")),
-                })
-                .collect()
-            }
-            RedbTx::Write(Some(tx)) => {
-                let table = match tx.open_table(TABLE) {
-                    Ok(t) => t,
-                    Err(e) => return vec![Err(miette::miette!("{e}"))],
-                };
-                let iter = match table.range::<&[u8]>(lower..upper) {
-                    Ok(i) => i,
-                    Err(e) => return vec![Err(miette::miette!("{e}"))],
-                };
-                iter.map(|r| match r {
-                    Ok(entry) => Ok((entry.0.value().to_vec(), entry.1.value().to_vec())),
-                    Err(e) => Err(miette::miette!("{e}")),
-                })
-                .collect()
-            }
-            RedbTx::Write(None) => vec![Err(miette::miette!("transaction already committed"))],
-        }
-    }
-
     fn seek_one(&self, lower: &[u8], upper: &[u8]) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
         
         match self {
