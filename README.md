@@ -49,10 +49,21 @@
 
 ## Introduction
 
-CozoDB is a general-purpose, transactional, relational database
-that uses **Datalog** for query, is **embeddable** but can also handle huge amounts of data and concurrency,
-and focuses on **graph** data and algorithms.
-It supports **time travel** and it is **performant**!
+`cozo-redb` is — and I always say this to anyone who will listen, though
+there are fewer of them these days than one might wish — an embedded,
+transactional database, which is only a fine way of saying that it lives
+quietly in the same room as the program it serves, and does not go
+shouting at it from another house altogether. It is queried in **Datalog**
+(a language, I am assured by those who know about such things, of
+considerable cleverness and long pedigree), and it keeps relational,
+graph, and vector data all under the one roof — which I always think is
+much the most sensible arrangement, for I cannot abide a household in
+which everything is scattered about in different rooms. It remembers,
+too, what it used to know — _time travel_, they call it, though it is
+nothing more alarming than a well-kept diary — and it stores all its
+affairs in a single tidy file by means of **redb**, which is, I am told,
+a pure-Rust mmap B-tree; and whilst I could not pretend to explain what
+that is, I am quite sure it is a very respectable thing indeed.
 
 ### What does _embeddable_ mean here?
 
