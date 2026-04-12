@@ -2378,11 +2378,11 @@ impl<'a> Iterator for CachedMaterializedIterator<'a> {
 #[cfg(test)]
 mod tests {
     use crate::data::value::DataValue;
-    use crate::DbInstance;
+    use crate::new_cozo_mem;
 
     #[test]
     fn test_mat_join() {
-        let db = DbInstance::default();
+        let db = new_cozo_mem().unwrap();
         let res = db
             .run_default(
                 r#"

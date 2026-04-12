@@ -6,11 +6,11 @@
  * You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use crate::{DataValue, DbInstance};
+use crate::{new_cozo_mem, DataValue};
 
 #[test]
 fn expression_eval() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
 
     let res = db
         .run_default(

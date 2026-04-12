@@ -1,7 +1,7 @@
-use cozo::{DbInstance, ScriptMutability};
+use cozo::{new_cozo_mem, ScriptMutability};
 
 fn main() {
-    let db = DbInstance::new("mem", "", Default::default()).unwrap();
+    let db = new_cozo_mem().unwrap();
     let script = "?[a] := a in [1, 2, 3]";
     let result = db
         .run_script(script, Default::default(), ScriptMutability::Immutable)

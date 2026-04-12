@@ -636,12 +636,12 @@ impl NormalFormInlineRule {
 
 #[cfg(test)]
 mod tests {
-    use crate::DbInstance;
+    use crate::new_cozo_mem;
     use serde_json::json;
 
     #[test]
     fn strange_case() {
-        let db = DbInstance::default();
+        let db = new_cozo_mem().unwrap();
 
         let query = r#"
             x[A] := A = 1

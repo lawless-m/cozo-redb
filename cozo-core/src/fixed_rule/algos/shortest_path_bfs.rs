@@ -125,11 +125,11 @@ impl FixedRule for ShortestPathBFS {
 mod tests {
     use crate::data::value::DataValue;
 
-    use crate::DbInstance;
+    use crate::new_cozo_mem;
 
     #[test]
     fn test_bfs_path() {
-        let db = DbInstance::default();
+        let db = new_cozo_mem().unwrap();
         let res = db
             .run_default(
                 r#"

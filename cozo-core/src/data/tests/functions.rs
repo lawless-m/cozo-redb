@@ -13,7 +13,7 @@ use serde_json::json;
 
 use crate::data::functions::*;
 use crate::data::value::{DataValue, RegexWrapper};
-use crate::DbInstance;
+use crate::new_cozo_mem;
 
 #[test]
 fn test_add() {
@@ -1456,7 +1456,7 @@ fn test_to_bool() {
 
 #[test]
 fn test_coalesce() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db.run_default("?[a] := a = null ~ 1 ~ 2").unwrap().rows;
     assert_eq!(res[0][0], DataValue::from(1));
     let res = db
@@ -1470,7 +1470,7 @@ fn test_coalesce() {
 
 #[test]
 fn test_range() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db
         .run_default("?[a] := a = int_range(1, 5)")
         .unwrap()

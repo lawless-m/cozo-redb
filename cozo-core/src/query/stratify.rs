@@ -310,11 +310,11 @@ impl NormalFormProgram {
 
 #[cfg(test)]
 mod tests {
-    use crate::DbInstance;
+    use crate::new_cozo_mem;
 
     #[test]
     fn test_dependencies() {
-        let db = DbInstance::default();
+        let db = new_cozo_mem().unwrap();
         let _res = db
             .run_default(
                 r#"

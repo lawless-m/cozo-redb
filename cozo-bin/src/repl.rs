@@ -20,7 +20,7 @@ use rustyline::history::DefaultHistory;
 use rustyline::Changeset;
 use serde_json::{json, Value};
 
-use cozo::{evaluate_expressions, DataValue, DbInstance, NamedRows, ScriptMutability};
+use cozo::{evaluate_expressions, DataValue, Db, NamedRows, ScriptMutability, Storage};
 
 struct Indented;
 
@@ -67,24 +67,25 @@ impl rustyline::validate::Validator for Indented {
 pub(crate) struct ReplArgs {
     /// Database engine: `mem` (non-persistent) or `redb` (persistent).
     #[clap(short, long, default_value_t = String::from("mem"))]
-    engine: String,
+    pub(crate) engine: String,
 
-    /// Path to the directory to store the database
+    /// Path to the redb database file
     #[clap(short, long, default_value_t = String::from("cozo.db"))]
-    path: String,
-
-    /// Extra config in JSON format
-    #[clap(short, long, default_value_t = String::from("{}"))]
-    config: String,
+    pub(crate) path: String,
 }
 
-pub(crate) fn repl_main(args: ReplArgs) -> Result<(), Box<dyn Error>> {
-    let db = DbInstance::new(&args.engine, args.path, &args.config).unwrap();
-
+pub(crate) fn repl_main<S>(db: Db<S>) -> Result<(), Box<dyn Error>>
+where
+    S: for<'s> Storage<'s> + 'static,
+{
     let db_copy = db.clone();
     ctrlc::set_handler(move || {
         let running = db_copy
-            .run_default("::running")
+            .run_script(
+                "::running",
+                BTreeMap::new(),
+                ScriptMutability::Mutable,
+            )
             .expect("Cannot determine running queries");
         for row in running.rows {
             let id = row.into_iter().next().unwrap();
@@ -145,12 +146,15 @@ pub(crate) fn repl_main(args: ReplArgs) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn process_line(
+fn process_line<S>(
     line: &str,
-    db: &DbInstance,
+    db: &Db<S>,
     params: &mut BTreeMap<String, DataValue>,
     save_next: &mut Option<String>,
-) -> miette::Result<()> {
+) -> miette::Result<()>
+where
+    S: for<'s> Storage<'s> + 'static,
+{
     let line = line.trim();
     if line.is_empty() {
         return Ok(());

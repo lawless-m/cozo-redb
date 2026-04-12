@@ -23,11 +23,11 @@ use crate::fts::{TokenizerCache, TokenizerConfig};
 use crate::parse::SourceSpan;
 use crate::runtime::callback::CallbackOp;
 use crate::runtime::db::Poison;
-use crate::{DbInstance, FixedRule, RegularTempStore, ScriptMutability};
+use crate::{new_cozo_mem, FixedRule, RegularTempStore, ScriptMutability};
 
 #[test]
 fn test_limit_offset() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db
         .run_default("?[a] := a in [5,3,1,2,4] :limit 2")
         .unwrap()
@@ -52,14 +52,14 @@ fn test_limit_offset() {
 
 #[test]
 fn test_normal_aggr_empty() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db.run_default("?[count(a)] := a in []").unwrap().rows;
     assert_eq!(res, vec![vec![DataValue::from(0)]]);
 }
 
 #[test]
 fn test_meet_aggr_empty() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db.run_default("?[min(a)] := a in []").unwrap().rows;
     assert_eq!(res, vec![vec![DataValue::Null]]);
 
@@ -74,7 +74,7 @@ fn test_meet_aggr_empty() {
 fn test_layers() {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db
         .run_default(
             r#"
@@ -92,7 +92,7 @@ fn test_layers() {
 #[test]
 fn test_conditions() {
     let _ = env_logger::builder().is_test(true).try_init();
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r#"
         {
@@ -122,7 +122,7 @@ fn test_conditions() {
 #[test]
 fn test_classical() {
     let _ = env_logger::builder().is_test(true).try_init();
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db
         .run_default(
             r#"
@@ -141,7 +141,7 @@ grandparent[gcld, gp] := parent[gcld, p], parent[p, gp]
 
 #[test]
 fn default_columns() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
 
     db.run_default(
         r#"
@@ -161,7 +161,7 @@ fn default_columns() {
 
 #[test]
 fn rm_does_not_need_all_keys() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(":create status {uid => mood}").unwrap();
     assert!(db
         .run_default("?[uid, mood] <- [[1, 2]] :put status {uid => mood}",)
@@ -177,7 +177,7 @@ fn rm_does_not_need_all_keys() {
 
 #[test]
 fn strict_checks_for_fixed_rules_args() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db.run_default(
         r#"
             r[] <- [[1, 2]]
@@ -187,7 +187,7 @@ fn strict_checks_for_fixed_rules_args() {
     println!("{:?}", res);
     assert!(res.is_ok());
 
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db.run_default(
         r#"
             r[] <- [[1, 2]]
@@ -196,7 +196,7 @@ fn strict_checks_for_fixed_rules_args() {
     );
     assert!(res.is_ok());
 
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db.run_default(
         r#"
             r[] <- [[1, 2]]
@@ -208,7 +208,7 @@ fn strict_checks_for_fixed_rules_args() {
 
 #[test]
 fn do_not_unify_underscore() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db
         .run_default(
             r#"
@@ -243,7 +243,7 @@ fn do_not_unify_underscore() {
 
 #[test]
 fn imperative_script() {
-    // let db = DbInstance::default();
+    // let db = new_cozo_mem().unwrap();
     // let res = db
     //     .run_default(
     //         r#"
@@ -324,7 +324,7 @@ fn imperative_script() {
 
 #[test]
 fn returning_relations() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db
         .run_default(
             r#"
@@ -346,7 +346,7 @@ fn returning_relations() {
 
 #[test]
 fn test_trigger() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(":create friends {fr: Int, to: Int => data: Any}")
         .unwrap();
     db.run_default(":create friends.rev {to: Int, fr: Int => data: Any}")
@@ -395,7 +395,7 @@ fn test_trigger() {
 
 #[test]
 fn test_callback() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let mut collected = vec![];
     let (_id, receiver) = db.register_callback("friends", None);
     db.run_default(":create friends {fr: Int, to: Int => data: Any}")
@@ -432,7 +432,7 @@ fn test_callback() {
 
 #[test]
 fn test_update() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(":create friends {fr: Int, to: Int => a: Any, b: Any, c: Any}")
         .unwrap();
     db.run_default("?[fr, to, a, b, c] <- [[1,2,3,4,5]] :put friends {fr, to => a, b, c}")
@@ -453,7 +453,7 @@ fn test_update() {
 
 #[test]
 fn test_index() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(":create friends {fr: Int, to: Int => data: Any}")
         .unwrap();
 
@@ -516,7 +516,7 @@ fn test_index() {
 
 #[test]
 fn test_json_objects() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default("?[a] := a = {'a': 1}").unwrap();
     db.run_default(
         r"?[a] := a = {
@@ -528,7 +528,7 @@ fn test_json_objects() {
 
 #[test]
 fn test_custom_rules() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     struct Custom;
 
     impl FixedRule for Custom {
@@ -578,7 +578,7 @@ fn test_custom_rules() {
 
 #[test]
 fn test_index_short() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(":create friends {fr: Int, to: Int => data: Any}")
         .unwrap();
 
@@ -637,7 +637,7 @@ fn test_index_short() {
 
 #[test]
 fn test_multi_tx() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let tx = db.multi_transaction(true);
     tx.run_script(":create a {a}", Default::default()).unwrap();
     tx.run_script("?[a] <- [[1]] :put a {a}", Default::default())
@@ -653,7 +653,7 @@ fn test_multi_tx() {
         json!([[1], [2], [3]])
     );
 
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let tx = db.multi_transaction(true);
     tx.run_script(":create a {a}", Default::default()).unwrap();
     tx.run_script("?[a] <- [[1]] :put a {a}", Default::default())
@@ -669,7 +669,7 @@ fn test_multi_tx() {
 
 #[test]
 fn test_vec_types() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(":create a {k: String => v: <F32; 8>}")
         .unwrap();
     db.run_default("?[k, v] <- [['k', [1,2,3,4,5,6,7,8]]] :put a {k => v}")
@@ -699,7 +699,7 @@ fn test_vec_types() {
 
 #[test]
 fn test_vec_index_insertion() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r"
         ?[k, v, m] <- [['a', [1,2], true],
@@ -740,7 +740,7 @@ fn test_vec_index_insertion() {
 
 #[test]
 fn test_vec_index() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r"
         ?[k, v] <- [['a', [1,2]],
@@ -810,7 +810,7 @@ fn test_vec_index() {
 
 #[test]
 fn test_fts_indexing() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r":create a {k: String => v: String}")
         .unwrap();
     db.run_default(
@@ -857,7 +857,7 @@ fn test_fts_indexing() {
 fn test_lsh_indexing2() {
     for i in 1..10 {
         let f = i as f64 / 10.;
-        let db = DbInstance::new("mem", "", "").unwrap();
+        let db = new_cozo_mem().unwrap();
         db.run_default(r":create a {k: String => v: String}")
             .unwrap();
         db.run_script(
@@ -879,7 +879,7 @@ fn test_lsh_indexing2() {
 fn test_lsh_indexing3() {
     for i in 1..10 {
         let f = i as f64 / 10.;
-        let db = DbInstance::new("mem", "", "").unwrap();
+        let db = new_cozo_mem().unwrap();
         db.run_default(r":create text {id: String,  => text: String, url: String? default null, dt: Float default now(), dup_for: String? default null }")
             .unwrap();
         db.run_script(
@@ -912,7 +912,7 @@ fn test_lsh_indexing3() {
 
 #[test]
 fn filtering() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     let res = db
         .run_default(
             r"
@@ -950,7 +950,7 @@ fn filtering() {
 fn test_lsh_indexing4() {
     for i in 1..10 {
         let f = i as f64 / 10.;
-        let db = DbInstance::new("mem", "", "").unwrap();
+        let db = new_cozo_mem().unwrap();
         db.run_default(r":create a {k: String => v: String}")
             .unwrap();
         db.run_script(
@@ -971,7 +971,7 @@ fn test_lsh_indexing4() {
 
 #[test]
 fn test_lsh_indexing() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r":create a {k: String => v: String}")
         .unwrap();
     db.run_default(
@@ -1038,7 +1038,7 @@ fn test_lsh_indexing() {
 
 #[test]
 fn test_insertions() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r":create a {k => v: <F32; 1536> default rand_vec(1536)}")
         .unwrap();
     db.run_default(r"?[k] <- [[1]] :put a {k}").unwrap();
@@ -1109,7 +1109,7 @@ fn tokenizers() {
 
 #[test]
 fn multi_index_vec() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r#"
         :create product {
@@ -1150,7 +1150,7 @@ fn multi_index_vec() {
 
 #[test]
 fn ensure_not() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r"
     %ignore_error { :create id_alloc{id: Int => next_id: Int, last_id: Int}}
@@ -1165,7 +1165,7 @@ fn ensure_not() {
 
 #[test]
 fn insertion() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r":create a {x => y}").unwrap();
     assert!(db
         .run_default(r"?[x, y] <- [[1, 2]] :insert a {x => y}",)
@@ -1177,7 +1177,7 @@ fn insertion() {
 
 #[test]
 fn deletion() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r":create a {x => y}").unwrap();
     assert!(db.run_default(r"?[x] <- [[1]] :delete a {x}").is_err());
     assert!(db
@@ -1188,7 +1188,7 @@ fn deletion() {
 
 #[test]
 fn into_payload() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r":create a {x => y}").unwrap();
     db.run_default(r"?[x, y] <- [[1, 2], [3, 4]] :insert a {x => y}")
         .unwrap();
@@ -1217,7 +1217,7 @@ fn into_payload() {
 
 #[test]
 fn returning() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(":create a {x => y}").unwrap();
     let res = db
         .run_default(r"?[x, y] <- [[1, 2]] :insert a {x => y} ")
@@ -1271,7 +1271,7 @@ fn returning() {
 
 #[test]
 fn parser_corner_case() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r#"?[x] := x = 1 or x = 2"#).unwrap();
     db.run_default(r#"?[C] := C = 1  orx[C] := C = 1"#).unwrap();
     db.run_default(r#"?[C] := C = true, C  inx[C] := C = 1"#)
@@ -1283,7 +1283,7 @@ fn parser_corner_case() {
 
 #[test]
 fn as_store_in_imperative_script() {
-    let db = DbInstance::new("mem", "", "").unwrap();
+    let db = new_cozo_mem().unwrap();
     let res = db
         .run_default(
             r#"
@@ -1342,7 +1342,7 @@ fn as_store_in_imperative_script() {
 
 #[test]
 fn update_shall_not_destroy_values() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r"?[x, y] <- [[1, 2]] :create z {x => y default 0}")
         .unwrap();
     let r = db.run_default(r"?[x, y] := *z {x, y}").unwrap();
@@ -1354,7 +1354,7 @@ fn update_shall_not_destroy_values() {
 
 #[test]
 fn update_shall_work() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r"?[x, y, z] <- [[1, 2, 3]] :create z {x => y, z}")
         .unwrap();
     let r = db.run_default(r"?[x, y, z] := *z {x, y, z}").unwrap();
@@ -1424,13 +1424,13 @@ fn sysop_in_imperatives() {
         }
         {::relations}
     "#;
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(script).unwrap();
 }
 
 #[test]
 fn bad_parse() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r"
         :create named_hero_history {
@@ -1453,7 +1453,7 @@ fn bad_parse() {
 
 #[test]
 fn puts() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r"
             :create cm_txt {
@@ -1486,7 +1486,7 @@ fn puts() {
 
 #[test]
 fn short_hand() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(r":create x {x => y, z}").unwrap();
     db.run_default(r"?[x, y, z] <- [[1, 2, 3]] :put x {}")
         .unwrap();
@@ -1496,7 +1496,7 @@ fn short_hand() {
 
 #[test]
 fn param_shorthand() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_script(
         r"
         ?[] <- [[$x, $y, $z]]
@@ -1516,7 +1516,7 @@ fn param_shorthand() {
 
 #[test]
 fn crashy_imperative() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r"
         {:create _test {a}}
@@ -1534,7 +1534,7 @@ fn crashy_imperative() {
 
 #[test]
 fn hnsw_index() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r#"
         :create beliefs {
@@ -1590,7 +1590,7 @@ fn hnsw_index() {
 
 #[test]
 fn fts_drop() {
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
     db.run_default(
         r#"
             :create entity {name}

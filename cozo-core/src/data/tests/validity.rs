@@ -8,7 +8,7 @@
  */
 
 use crate::data::value::DataValue;
-use crate::DbInstance;
+use crate::new_cozo_mem;
 use serde_json::json;
 use std::env;
 
@@ -19,7 +19,7 @@ fn test_validity() {
     let _ = std::fs::remove_dir_all(path);
     let db_kind = env::var("COZO_TEST_DB_ENGINE").unwrap_or("mem".to_string());
     println!("Using {} engine", db_kind);
-    let db = DbInstance::default();
+    let db = new_cozo_mem().unwrap();
 
     db.run_default(":create vld {a, v: Validity => d}").unwrap();
 

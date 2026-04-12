@@ -1,7 +1,7 @@
-use cozo::{data::functions::current_validity, parse::parse_script, DbInstance, ScriptMutability};
+use cozo::{data::functions::current_validity, new_cozo_mem, parse::parse_script, ScriptMutability};
 
 fn main() {
-    let db = DbInstance::new("mem", "", Default::default()).unwrap();
+    let db = new_cozo_mem().unwrap();
     let script = "?[a] := a in [1, 2, 3]";
     let cur_vld = current_validity();
     let script_ast =

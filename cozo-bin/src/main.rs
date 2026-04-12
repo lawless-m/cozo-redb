@@ -9,6 +9,9 @@
 use std::process::exit;
 
 use clap::Parser;
+use cozo::new_cozo_mem;
+#[cfg(feature = "storage-redb")]
+use cozo::new_cozo_redb;
 
 use crate::repl::{repl_main, ReplArgs};
 
@@ -16,7 +19,16 @@ mod repl;
 
 fn main() {
     let args = ReplArgs::parse();
-    if let Err(e) = repl_main(args) {
+    let result = match args.engine.as_str() {
+        "mem" => repl_main(new_cozo_mem().unwrap()),
+        #[cfg(feature = "storage-redb")]
+        "redb" => repl_main(new_cozo_redb(&args.path).unwrap()),
+        engine => {
+            eprintln!("unknown engine: {engine}");
+            exit(-1);
+        }
+    };
+    if let Err(e) = result {
         eprintln!("{e}");
         exit(-1);
     }

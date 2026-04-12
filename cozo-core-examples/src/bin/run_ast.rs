@@ -7,11 +7,11 @@ use cozo::{
         symb::PROG_ENTRY,
     },
     parse::{CozoScript, ImperativeStmt, ImperativeStmtClause},
-    DataValue, DbInstance, Num, ScriptMutability, Symbol,
+    new_cozo_mem, DataValue, Num, ScriptMutability, Symbol,
 };
 
 fn main() {
-    let db = DbInstance::new("mem", "", Default::default()).unwrap();
+    let db = new_cozo_mem().unwrap();
     let sym_a = Symbol::new("a", Default::default());
     let script = CozoScript::Imperative(vec![ImperativeStmt::Program {
         prog: ImperativeStmtClause {
