@@ -3,8 +3,12 @@ resolver = "2"
 members = [
     "cozo-core",
     "cozo-bin",
-    "cozo-lib-wasm",
     "cozo-core-examples",
+]
+exclude = [
+    # cozo-lib-wasm is parked pending a rewrite against the typed
+    # API surface after the `_str` FFI wrappers were deleted.
+    "cozo-lib-wasm",
 ]
 
 [profile.bench]

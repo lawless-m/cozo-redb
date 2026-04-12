@@ -11,7 +11,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::default::Default;
 use std::fmt::{Debug, Formatter};
 use std::iter;
-use std::path::Path;
 #[allow(unused_imports)]
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};

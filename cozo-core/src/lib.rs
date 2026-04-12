@@ -34,22 +34,13 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
-#[allow(unused_imports)]
-use std::time::Instant;
 
 use crossbeam::channel::{bounded, Receiver, Sender};
 use data::functions::current_validity;
-use lazy_static::lazy_static;
 pub use miette::Error;
-use miette::Report;
-#[allow(unused_imports)]
-use miette::{
-    bail, miette, GraphicalReportHandler, GraphicalTheme, IntoDiagnostic, JSONReportHandler,
-    Result, ThemeCharacters, ThemeStyles,
-};
+use miette::{bail, Result};
 use parse::parse_script;
 use parse::CozoScript;
-use serde_json::json;
 
 pub use data::value::{DataValue, Num, RegexWrapper, UuidWrapper, Validity, ValidityTs};
 pub use fixed_rule::{FixedRule, FixedRuleInputRelation, FixedRulePayload};
@@ -63,7 +54,6 @@ pub use storage::re::{new_cozo_redb, RedbStorage};
 pub use storage::{Storage, StoreTx};
 
 pub use crate::data::expr::Expr;
-use crate::data::json::JsonValue;
 pub use crate::data::symb::Symbol;
 pub use crate::data::value::{JsonData, Vector};
 pub use crate::fixed_rule::SimpleFixedRule;
@@ -132,15 +122,6 @@ impl DbInstance {
             ),
         })
     }
-    /// Same as [Self::new], but inputs and error messages are all in strings
-    pub fn new_with_str(
-        engine: &str,
-        path: &str,
-        options: &str,
-    ) -> std::result::Result<Self, String> {
-        Self::new(engine, path, options).map_err(|err| err.to_string())
-    }
-
     /// Dispatcher method.  See [crate::Db::get_fixed_rules].
     pub fn get_fixed_rules(&self) -> BTreeMap<String, Arc<Box<dyn FixedRule>>> {
         match self {
@@ -180,61 +161,6 @@ impl DbInstance {
             DbInstance::Redb(db) => db.run_script_ast(payload, cur_vld, mutability),
         }
     }
-    /// Run the CozoScript passed in. The `params` argument is a map of parameters.
-    /// Fold any error into the return JSON itself.
-    /// See [crate::Db::run_script].
-    pub fn run_script_fold_err(
-        &self,
-        payload: &str,
-        params: BTreeMap<String, DataValue>,
-        mutability: ScriptMutability,
-    ) -> JsonValue {
-        #[cfg(not(target_arch = "wasm32"))]
-        let start = Instant::now();
-
-        match self.run_script(payload, params, mutability) {
-            Ok(named_rows) => {
-                let mut j_val = named_rows.into_json();
-                #[cfg(not(target_arch = "wasm32"))]
-                let took = start.elapsed().as_secs_f64();
-                let map = j_val.as_object_mut().unwrap();
-                map.insert("ok".to_string(), json!(true));
-                #[cfg(not(target_arch = "wasm32"))]
-                map.insert("took".to_string(), json!(took));
-
-                j_val
-            }
-            Err(err) => format_error_as_json(err, Some(payload)),
-        }
-    }
-    /// Run the CozoScript passed in. The `params` argument is a map of parameters formatted as JSON.
-    /// See [crate::Db::run_script].
-    pub fn run_script_str(&self, payload: &str, params: &str, immutable: bool) -> String {
-        let params_json = if params.is_empty() {
-            BTreeMap::default()
-        } else {
-            match serde_json::from_str::<BTreeMap<String, JsonValue>>(params) {
-                Ok(map) => map
-                    .into_iter()
-                    .map(|(k, v)| (k, DataValue::from(v)))
-                    .collect(),
-                Err(_) => {
-                    return json!({"ok": false, "message": "params argument is not a JSON map"})
-                        .to_string();
-                }
-            }
-        };
-        self.run_script_fold_err(
-            payload,
-            params_json,
-            if immutable {
-                ScriptMutability::Immutable
-            } else {
-                ScriptMutability::Mutable
-            },
-        )
-        .to_string()
-    }
     /// Dispatcher method. See [crate::Db::export_relations].
     pub fn export_relations<I, T>(&self, relations: I) -> Result<BTreeMap<String, NamedRows>>
     where
@@ -247,32 +173,6 @@ impl DbInstance {
             DbInstance::Redb(db) => db.export_relations(relations),
         }
     }
-    /// Export relations to JSON-encoded string.
-    /// See [crate::Db::export_relations]
-    pub fn export_relations_str(&self, data: &str) -> String {
-        match self.export_relations_str_inner(data) {
-            Ok(s) => {
-                let ret = json!({"ok": true, "data": s});
-                format!("{ret}")
-            }
-            Err(err) => {
-                let ret = json!({"ok": false, "message": err.to_string()});
-                format!("{ret}")
-            }
-        }
-    }
-    fn export_relations_str_inner(&self, data: &str) -> Result<JsonValue> {
-        #[derive(serde_derive::Deserialize)]
-        struct Payload {
-            relations: Vec<String>,
-        }
-        let j_val: Payload = serde_json::from_str(data).into_diagnostic()?;
-        let results = self.export_relations(j_val.relations.iter().map(|s| s as &str))?;
-        Ok(results
-            .into_iter()
-            .map(|(k, v)| (k, v.into_json()))
-            .collect())
-    }
     /// Dispatcher method. See [crate::Db::import_relations].
     pub fn import_relations(&self, data: BTreeMap<String, NamedRows>) -> Result<()> {
         match self {
@@ -280,33 +180,6 @@ impl DbInstance {
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.import_relations(data),
         }
-    }
-    /// Import a relation, the data is given as a JSON string, and the returned result is converted into a string.
-    /// See [crate::Db::import_relations].
-    pub fn import_relations_str(&self, data: &str) -> String {
-        match self.import_relations_str_with_err(data) {
-            Ok(()) => {
-                format!("{}", json!({"ok": true}))
-            }
-            Err(err) => {
-                format!("{}", json!({"ok": false, "message": err.to_string()}))
-            }
-        }
-    }
-    /// Import a relation, the data is given as a JSON string.
-    /// See [crate::Db::import_relations].
-    pub fn import_relations_str_with_err(&self, data: &str) -> Result<()> {
-        let json_data: JsonValue = serde_json::from_str(data).into_diagnostic()?;
-        let json_object = json_data
-            .as_object()
-            .ok_or_else(|| miette!("A JSON object is requried"))?;
-        let mapping = json_object
-            .iter()
-            .map(|(k, v)| -> Result<(String, NamedRows)> {
-                Ok((k.to_string(), NamedRows::from_json(v)?))
-            })
-            .collect::<Result<_>>()?;
-        self.import_relations(mapping)
     }
     /// Dispatcher method. See [crate::Db::register_callback].
     #[cfg(not(target_arch = "wasm32"))]
@@ -430,34 +303,3 @@ impl MultiTransaction {
     }
 }
 
-/// Convert error raised by the database into friendly JSON format
-pub fn format_error_as_json(mut err: Report, source: Option<&str>) -> JsonValue {
-    if err.source_code().is_none() {
-        if let Some(src) = source {
-            err = err.with_source_code(format!("{src} "));
-        }
-    }
-    let mut text_err = String::new();
-    let mut json_err = String::new();
-    TEXT_ERR_HANDLER
-        .render_report(&mut text_err, err.as_ref())
-        .expect("render text error failed");
-    JSON_ERR_HANDLER
-        .render_report(&mut json_err, err.as_ref())
-        .expect("render json error failed");
-    let mut json: serde_json::Value =
-        serde_json::from_str(&json_err).expect("parse rendered json error failed");
-    let map = json.as_object_mut().unwrap();
-    map.insert("ok".to_string(), json!(false));
-    map.insert("display".to_string(), json!(text_err));
-    json
-}
-
-lazy_static! {
-    static ref TEXT_ERR_HANDLER: GraphicalReportHandler = miette::GraphicalReportHandler::new()
-        .with_theme(GraphicalTheme {
-            characters: ThemeCharacters::unicode(),
-            styles: ThemeStyles::ansi()
-        });
-    static ref JSON_ERR_HANDLER: JSONReportHandler = miette::JSONReportHandler::new();
-}

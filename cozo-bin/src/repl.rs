@@ -259,19 +259,26 @@ fn process_line(
             }
             "import" => {
                 let url = payload.trim();
-                if url.starts_with("http://") || url.starts_with("https://") {
-                    let data = minreq::get(url).send().into_diagnostic()?;
-                    let data = data.as_str().into_diagnostic()?;
-                    db.import_relations_str_with_err(data)?;
-                    println!("Imported data from {url}")
+                let data = if url.starts_with("http://") || url.starts_with("https://") {
+                    let resp = minreq::get(url).send().into_diagnostic()?;
+                    resp.as_str().into_diagnostic()?.to_string()
                 } else {
                     let file_path = url.strip_prefix("file://").unwrap_or(url);
                     let mut file = File::open(file_path).into_diagnostic()?;
                     let mut content = String::new();
                     file.read_to_string(&mut content).into_diagnostic()?;
-                    db.import_relations_str_with_err(&content)?;
-                    println!("Imported data from {url}");
-                }
+                    content
+                };
+                let json_data: Value = serde_json::from_str(&data).into_diagnostic()?;
+                let json_object = json_data
+                    .as_object()
+                    .ok_or_else(|| miette!("A JSON object is required"))?;
+                let mapping = json_object
+                    .iter()
+                    .map(|(k, v)| NamedRows::from_json(v).map(|r| (k.to_string(), r)))
+                    .collect::<Result<_, _>>()?;
+                db.import_relations(mapping)?;
+                println!("Imported data from {url}");
             }
             _ => {
                 let out = db.run_script(line, params.clone(), ScriptMutability::Mutable)?;
