@@ -1,80 +1,95 @@
-# Contributor Covenant Code of Conduct
+# A Code of Conduct, in the Squeersian Manner
 
-## Our Pledge
+## Preamble, or, The Philosophy of the Thing
 
-We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
+My dears, it is the custom in these modern times for every gentleman's
+repository to be furnished with a great quantity of solemn promises
+concerning who may speak, who may not, and in what tone of voice a
+person's feelings are to be consulted before a line of code is so much
+as commented upon. Here at `cozo-redb`, we take a different view. We
+are engaged in the practical mode of building a database, which is a
+species of philosophy; and philosophy — as every right-thinking person
+knows — will not be taught by coddling.
 
-We pledge to act and interact in ways that contribute to an open, welcoming, diverse, inclusive, and healthy community.
+This document sets down what is expected of any person who would
+contribute to the establishment, and what that person may expect in
+return.
 
-## Our Standards
+## What the Contributor Shall Bring
 
-Examples of behavior that contributes to a positive environment for our community include:
+The test of a contribution here is this, and this alone: **does it make
+the database better?** Does the patch build? Does it fix a bug? Does
+it render the code plainer, the tests greener, the benchmarks faster?
+If so, it is welcome, whosoever sent it. We are not in the habit of
+consulting a person's credentials, their background, their years of
+experience, nor any other particular of their private life, before
+deciding whether their work shall stand. Merit is the master here, and
+merit is a sufficient master.
 
-* Demonstrating empathy and kindness toward other people
-* Being respectful of differing opinions, viewpoints, and experiences
-* Giving and gracefully accepting constructive feedback
-* Accepting responsibility and apologizing to those affected by our mistakes, and learning from the experience
-* Focusing on what is best not just for us as individuals, but for the overall community
+C-o-d-e, code, noun, that which compiles. Q-u-a-l-i-t-y, quality, that
+which, being tested, passeth. When the contributor knows this out of
+book, he sends us a pull request, and there's an end on't.
 
-Examples of unacceptable behavior include:
+## What the Contributor Shall Expect
 
-* The use of sexualized language or imagery, and sexual attention or advances of any kind
-* Trolling, insulting or derogatory comments, and personal or political attacks
-* Public or private harassment
-* Publishing others' private information, such as a physical or email address, without their explicit permission
-* Contacting individual members, contributors, or leaders privately, outside designated community mechanisms, without their explicit permission
-* Other conduct which could reasonably be considered inappropriate in a professional setting
+In return, the contributor shall expect **plain speech**. If the patch
+is good, it shall be so named. If it is poor, it shall likewise be
+so named — blunt, without sugar, without ceremony, and without any of
+that fine-spun apology of the kind presently fashionable. We are not
+here to spare feelings; we are here to spare bugs. A reviewer who tells
+you your approach is muddled is doing you a greater kindness than one
+who tells you it is "interesting" — and you are expected to receive the
+former with at least the same grace as the latter.
 
-## Enforcement Responsibilities
+Here's richness, my dears: **robust criticism is not harassment**, and
+the conflation of the two is not practised in this schoolroom.
 
-Community leaders are responsible for clarifying and enforcing our standards of acceptable behavior and will take appropriate and fair corrective action in response to any behavior that they deem inappropriate, threatening, offensive, or harmful.
+## What Shall Not Be Suffered
 
-Community leaders have the right and responsibility to remove, edit, or reject comments, commits, code, wiki edits, issues, and other contributions that are not aligned to this Code of Conduct, and will communicate reasons for moderation decisions when appropriate.
+There are, even so, a few things a person might do that would see them
+shown the door, and it is only fair to list them plainly:
 
-## Scope
+* **Attacks upon the person, rather than the work.** Say what you will
+  of a patch; say nothing of the patcher's mother, face, nation, or
+  faith. These are not matters upon which the database has an opinion.
+* **Dishonest dealing.** Plagiarism, misrepresentation of authorship,
+  licence-washing, or the deliberate concealment of a patch's origin
+  or effect. A contributor who will not tell the truth about his own
+  work is of no use to any project.
+* **Harassment of an individual**, within this repository's channels
+  or tracked outside them: unwanted and repeated contact after being
+  asked to desist, threats of violence, or the publishing of another
+  person's private information without their leave.
+* **Spam, off-topic agitation, and the grinding of personal axes upon
+  the project's whetstone.** The issue tracker is for issues with the
+  database, not for tracts upon unrelated subjects.
 
-This Code of Conduct applies within all community spaces, and also applies when an individual is officially representing the community in public spaces. Examples of representing our community include using an official e-mail address, posting via an official social media account, or acting as an appointed representative at an online or offline event.
+Observe that **bluntness, disagreement, sharp review, and the rebuking
+of bad work** are none of them upon this list, and shall not be placed
+there by any subsequent revision.
 
-## Enforcement
+## Of Enforcement, and the Cane Metaphorical
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at opensource@github.com. All complaints will be reviewed and investigated promptly and fairly.
+The maintainer of this fork (see `README.md` for the identity of that
+happy person) is the sole arbiter of the foregoing. The procedure is
+simple, and shall remain simple:
 
-All community leaders are obligated to respect the privacy and security of the reporter of any incident.
+1. **A word.** First, a plain word — in the offending thread, or by
+   private message — setting out what the matter is.
+2. **A warning.** Should the behaviour continue, a warning, with plain
+   statement of what comes next.
+3. **The door.** Should the behaviour still continue, the contributor
+   shall be blocked from the repository, and there's an end on't.
 
-## Enforcement Guidelines
+No committees, no tribunals, no appeals to distant addresses staffed
+by strangers. The schoolmaster keeps his own discipline.
 
-Community leaders will follow these Community Impact Guidelines in determining the consequences for any action they deem in violation of this Code of Conduct:
+## A Final Word
 
-### 1. Correction
+This is a small fork with a narrow purpose: a tight, Rust-first graph
+database built upon redb. It has no ambition to police the morals of
+the wider world, nor to be policed by it. Bring your work; let it be
+judged; take your review; improve, or depart. Subdue your appetite for
+applause, my dears, and you've conquered human natur.
 
-**Community Impact**: Use of inappropriate language or other behavior deemed unprofessional or unwelcome in the community.
-
-**Consequence**: A private, written warning from community leaders, providing clarity around the nature of the violation and an explanation of why the behavior was inappropriate. A public apology may be requested.
-
-### 2. Warning
-
-**Community Impact**: A violation through a single incident or series of actions.
-
-**Consequence**: A warning with consequences for continued behavior. No interaction with the people involved, including unsolicited interaction with those enforcing the Code of Conduct, for a specified period of time. This includes avoiding interactions in community spaces as well as external channels like social media. Violating these terms may lead to a temporary or permanent ban.
-
-### 3. Temporary Ban
-
-**Community Impact**: A serious violation of community standards, including sustained inappropriate behavior.
-
-**Consequence**: A temporary ban from any sort of interaction or public communication with the community for a specified period of time. No public or private interaction with the people involved, including unsolicited interaction with those enforcing the Code of Conduct, is allowed during this period. Violating these terms may lead to a permanent ban.
-
-### 4. Permanent Ban
-
-**Community Impact**: Demonstrating a pattern of violation of community standards, including sustained inappropriate behavior,  harassment of an individual, or aggression toward or disparagement of classes of individuals.
-
-**Consequence**: A permanent ban from any sort of public interaction within the community.
-
-## Attribution
-
-This Code of Conduct is adapted from the [Contributor Covenant][homepage], version 2.0, available at <https://www.contributor-covenant.org/version/2/0/code_of_conduct.html>.
-
-Community Impact Guidelines were inspired by [Mozilla's code of conduct enforcement ladder](https://github.com/mozilla/diversity).
-
-[homepage]: https://www.contributor-covenant.org
-
-For answers to common questions about this code of conduct, see the FAQ at <https://www.contributor-covenant.org/faq>. Translations are available at <https://www.contributor-covenant.org/translations>.
+— The Management
