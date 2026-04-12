@@ -1,19 +1,25 @@
 <img src="static/logo_c.png" width="200" height="175" alt="Logo">
 
-[![CI](https://github.com/lawless-m/cozo-rs/actions/workflows/build.yml/badge.svg)](https://github.com/lawless-m/cozo-rs/actions/workflows/build.yml)
-[![License](https://img.shields.io/github/license/lawless-m/cozo-rs)](https://github.com/lawless-m/cozo-rs/blob/main/LICENSE.txt)
+[![CI](https://github.com/lawless-m/cozo-redb/actions/workflows/build.yml/badge.svg)](https://github.com/lawless-m/cozo-redb/actions/workflows/build.yml)
+[![License](https://img.shields.io/github/license/lawless-m/cozo-redb)](https://github.com/lawless-m/cozo-redb/blob/main/LICENSE.txt)
 
-# `CozoDB` — maintained fork
+# `cozo-redb`
 
-> **You probably arrived here looking for [cozodb/cozo](https://github.com/cozodb/cozo).**
-> That project has been dormant since December 2024. This is a personal maintenance fork,
-> not affiliated with the original author. The **query language, semantics, and most of
-> the core engine are unchanged** — so the [upstream documentation](https://docs.cozodb.org/)
-> and its many mirrors (readthedocs, docs.rs for published crates, etc.) still describe
-> how queries work here.
+> **A Rust graph database backed by [redb](https://github.com/cberner/redb).**
 >
-> The fork is **pure Rust, redb-backed, tight and focused.** In one long day it was
-> stripped of:
+> `cozo-redb` is an aggressive fork of [cozodb/cozo](https://github.com/cozodb/cozo) —
+> Ziyang Hu's transactional Datalog database, which has been dormant since December 2024.
+> This fork picks **redb** (a pure-Rust mmap B-tree) as its single persistent backend and
+> deletes everything else. The query language, Datalog semantics, time-travel relations,
+> HNSW vector search, MinHash-LSH, and full-text index are all inherited unchanged from
+> upstream — the [upstream documentation](https://docs.cozodb.org/) and its mirrors
+> (readthedocs, docs.rs for upstream crates) still describe how queries work here.
+>
+> This is not a takeover bid or a bid for the upstream name. It's a personal maintenance
+> furrow with a specific angle: **redb is the interesting backend upstream never shipped,
+> and we want a tight Rust-first graph database to use.**
+>
+> In one long day this fork was stripped of:
 >
 > * the `cozorocks` C++ FFI subcrate and its 42 MB vendored `librocksdb` submodule;
 > * the `sled`, `tikv`, `sqlite`, and `rocksdb` storage backends;
@@ -269,20 +275,19 @@ original upstream [execution docs](https://docs.cozodb.org/en/latest/execution.h
 
 ## Status of the project
 
-This is a personal maintenance fork of [cozodb/cozo](https://github.com/cozodb/cozo),
-which has been dormant since December 2024. It exists so I have a non-Neo4j graph
-database in my toolkit that I can actually keep alive: adding backends, fixing bugs,
-wiring up CI, and following interesting changes from other forks as they surface.
+`cozo-redb` exists so I have a tight, pure-Rust graph database in my personal toolkit.
+It is not a community takeover bid, not a claim on the CozoDB name, and makes no
+promise of support, release cadence, or stability for anyone else. Pick it up if the
+specific shape of "redb + Datalog + time travel + vector search, nothing else" is
+what you need.
 
-It is not a community takeover bid and makes no promise of support, release cadence,
-or stability for anyone else. That said, the code is MPL-2.0 and PRs / issues are
-welcome if you're using it.
+MPL-2.0, PRs and issues welcome if you are using it.
 
 Versions before 1.0 do not promise syntax/API stability or storage compatibility.
 
 ## Links
 
-* [Fork repo](https://github.com/lawless-m/cozo-rs) — this repository
+* [Fork repo](https://github.com/lawless-m/cozo-redb) — this repository
 * [Upstream repo (dormant)](https://github.com/cozodb/cozo) — the original CozoDB
 * [Upstream query language docs](https://docs.cozodb.org/en/latest/) — tutorial, execution model, built-in functions (still accurate for this fork)
 * [Rust API docs](https://docs.rs/cozo/) — generated from upstream's last release; this fork's docs land on docs.rs after a release

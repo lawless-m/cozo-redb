@@ -3,9 +3,9 @@ name = "cozo-bin"
 version = "0.7.6"
 edition = "2021"
 license = "MPL-2.0"
-description = "Standalone CozoDB REPL"
+description = "Standalone cozo-redb REPL"
 authors = ["Ziyang Hu", "Matt Lawless"]
-repository = "https://github.com/lawless-m/cozo-rs"
+repository = "https://github.com/lawless-m/cozo-redb"
 
 [features]
 #! # Features
