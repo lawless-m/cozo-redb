@@ -1325,29 +1325,17 @@ impl<'a> SessionTx<'a> {
             })
             .collect_vec();
 
-        if self.store_tx.supports_par_put() {
-            for tuple in rel_handle.scan_all(self) {
-                let tuple = tuple?;
-                let extracted = extraction_indices
-                    .iter()
-                    .map(|idx| tuple[*idx].clone())
-                    .collect_vec();
-                let key = idx_handle.encode_key_for_store(&extracted, Default::default())?;
-                self.store_tx.par_put(&key, &[])?;
-            }
-        } else {
-            let mut existing = TempCollector::default();
-            for tuple in rel_handle.scan_all(self) {
-                existing.push(tuple?);
-            }
-            for tuple in existing.into_iter() {
-                let extracted = extraction_indices
-                    .iter()
-                    .map(|idx| tuple[*idx].clone())
-                    .collect_vec();
-                let key = idx_handle.encode_key_for_store(&extracted, Default::default())?;
-                self.store_tx.put(&key, &[])?;
-            }
+        let mut existing = TempCollector::default();
+        for tuple in rel_handle.scan_all(self) {
+            existing.push(tuple?);
+        }
+        for tuple in existing.into_iter() {
+            let extracted = extraction_indices
+                .iter()
+                .map(|idx| tuple[*idx].clone())
+                .collect_vec();
+            let key = idx_handle.encode_key_for_store(&extracted, Default::default())?;
+            self.store_tx.put(&key, &[])?;
         }
 
         // add index to relation

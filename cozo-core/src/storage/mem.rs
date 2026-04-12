@@ -44,10 +44,6 @@ pub struct MemStorage {
 impl<'s> Storage<'s> for MemStorage {
     type Tx = MemTx<'s>;
 
-    fn storage_kind(&self) -> &'static str {
-        "mem"
-    }
-
     fn transact(&'s self, write: bool) -> Result<Self::Tx> {
         Ok(if write {
             let wtr = self.store.write().unwrap();
@@ -59,18 +55,6 @@ impl<'s> Storage<'s> for MemStorage {
     }
 
     fn range_compact(&'s self, _lower: &[u8], _upper: &[u8]) -> Result<()> {
-        Ok(())
-    }
-
-    fn batch_put<'a>(
-        &'a self,
-        data: Box<dyn Iterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a>,
-    ) -> Result<()> {
-        let mut store = self.store.write().unwrap();
-        for pair in data {
-            let (k, v) = pair?;
-            store.insert(k, v);
-        }
         Ok(())
     }
 }
@@ -104,14 +88,6 @@ impl<'s> StoreTx<'s> for MemTx<'s> {
                 Ok(())
             }
         }
-    }
-
-    fn supports_par_put(&self) -> bool {
-        false
-    }
-
-    fn par_put(&self, _key: &[u8], _val: &[u8]) -> Result<()> {
-        panic!()
     }
 
     fn del(&mut self, key: &[u8]) -> Result<()> {
@@ -266,20 +242,6 @@ impl<'s> StoreTx<'s> for MemTx<'s> {
         })
     }
 
-    fn total_scan<'a>(&'a self) -> Box<dyn Iterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a>
-    where
-        's: 'a,
-    {
-        match self {
-            MemTx::Reader(rdr) => Box::new(rdr.iter().map(|(k, v)| Ok((k.clone(), v.clone())))),
-            MemTx::Writer(wtr, cache) => Box::new(CacheIterRaw {
-                change_iter: cache.iter().fuse(),
-                db_iter: wtr.iter().fuse(),
-                change_cache: None,
-                db_cache: None,
-            }),
-        }
-    }
 }
 
 struct CacheIterRaw<'a, C, T>

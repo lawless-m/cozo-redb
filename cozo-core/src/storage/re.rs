@@ -44,10 +44,6 @@ pub struct RedbStorage {
 impl<'s> Storage<'s> for RedbStorage {
     type Tx = RedbTx;
 
-    fn storage_kind(&self) -> &'static str {
-        "redb"
-    }
-
     fn transact(&'s self, write: bool) -> Result<Self::Tx> {
         if write {
             let tx = self.db.begin_write().into_diagnostic()?;
@@ -59,24 +55,6 @@ impl<'s> Storage<'s> for RedbStorage {
     }
 
     fn range_compact(&'s self, _lower: &[u8], _upper: &[u8]) -> Result<()> {
-        Ok(())
-    }
-
-    fn batch_put<'a>(
-        &'a self,
-        data: Box<dyn Iterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a>,
-    ) -> Result<()> {
-        let tx = self.db.begin_write().into_diagnostic()?;
-        {
-            let mut table = tx.open_table(TABLE).into_diagnostic()?;
-            for result in data {
-                let (key, val) = result?;
-                table
-                    .insert(key.as_slice(), val.as_slice())
-                    .into_diagnostic()?;
-            }
-        }
-        tx.commit().into_diagnostic()?;
         Ok(())
     }
 }
@@ -120,10 +98,6 @@ impl<'s> StoreTx<'s> for RedbTx {
             }
             RedbTx::Write(None) => bail!("transaction already committed"),
         }
-    }
-
-    fn supports_par_put(&self) -> bool {
-        false
     }
 
     fn del(&mut self, key: &[u8]) -> Result<()> {
@@ -260,13 +234,6 @@ impl<'s> StoreTx<'s> for RedbTx {
             }
             RedbTx::Write(None) => bail!("transaction already committed"),
         }
-    }
-
-    fn total_scan<'a>(&'a self) -> Box<dyn Iterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a>
-    where
-        's: 'a,
-    {
-        self.range_scan(&[], &[u8::MAX])
     }
 }
 

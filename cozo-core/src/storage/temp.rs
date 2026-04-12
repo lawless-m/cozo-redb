@@ -23,10 +23,6 @@ pub(crate) struct TempStorage;
 impl<'s> Storage<'s> for TempStorage {
     type Tx = TempTx;
 
-    fn storage_kind(&self) -> &'static str {
-        "temp"
-    }
-
     fn transact(&'s self, _write: bool) -> Result<Self::Tx> {
         Ok(TempTx {
             store: Default::default(),
@@ -35,13 +31,6 @@ impl<'s> Storage<'s> for TempStorage {
 
     fn range_compact(&'s self, _lower: &[u8], _upper: &[u8]) -> Result<()> {
         panic!("range compact called on temp store")
-    }
-
-    fn batch_put<'a>(
-        &'a self,
-        _data: Box<dyn Iterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a>,
-    ) -> Result<()> {
-        panic!("batch put compact called on temp store")
     }
 }
 
@@ -57,10 +46,6 @@ impl<'s> StoreTx<'s> for TempTx {
     fn put(&mut self, key: &[u8], val: &[u8]) -> Result<()> {
         self.store.insert(key.to_vec(), val.to_vec());
         Ok(())
-    }
-
-    fn supports_par_put(&self) -> bool {
-        false
     }
 
     fn del(&mut self, key: &[u8]) -> Result<()> {
@@ -133,12 +118,5 @@ impl<'s> StoreTx<'s> for TempTx {
         's: 'a,
     {
         Ok(self.store.range(lower.to_vec()..upper.to_vec()).count())
-    }
-
-    fn total_scan<'a>(&'a self) -> Box<dyn Iterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a>
-    where
-        's: 'a,
-    {
-        Box::new(self.store.iter().map(|(k, v)| Ok((k.clone(), v.clone()))))
     }
 }
