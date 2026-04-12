@@ -66,28 +66,16 @@ jobs:
       - name: Test
         run: cargo test -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb --lib
 
-  workspace-members:
-    name: check (${{ matrix.crate }})
+  cozo-bin:
+    name: cozo-bin
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - crate: cozo-bin
-            features: compact,storage-rocksdb
-          - crate: cozo_c
-            features: compact,storage-rocksdb
-          - crate: cozo_py
-            features: compact,storage-rocksdb
-          - crate: cozo-node
-            features: compact,storage-rocksdb
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ws-${{ matrix.crate }}
-      - run: cargo check -p ${{ matrix.crate }} --no-default-features --features ${{ matrix.features }}
+          key: cozo-bin
+      - run: cargo check -p cozo-bin --no-default-features --features compact,storage-rocksdb
 
   docs:
     name: docs

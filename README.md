@@ -1,21 +1,25 @@
 <img src="static/logo_c.png" width="200" height="175" alt="Logo">
 
-[![docs](https://img.shields.io/readthedocs/cozo/latest)](https://docs.cozodb.org/)
-[![cozo-node](https://img.shields.io/npm/v/cozo-node)](https://www.npmjs.com/package/cozo-node)
-[![npm (web)](https://img.shields.io/npm/v/cozo-lib-wasm?label=browser)](https://www.npmjs.com/package/cozo-lib-wasm)
-[![Crates.io](https://img.shields.io/crates/v/cozo)](https://crates.io/crates/cozo)
-[![docs.rs](https://img.shields.io/docsrs/cozo?label=docs.rs)](https://docs.rs/cozo)
-[![pypi](https://img.shields.io/pypi/v/pycozo)](https://pypi.org/project/pycozo/)
-[![java](https://img.shields.io/maven-central/v/io.github.cozodb/cozo_java?label=java)](https://mvnrepository.com/artifact/io.github.cozodb/cozo_java)
-[![clj](https://img.shields.io/maven-central/v/io.github.cozodb/cozo-clj?label=clj)](https://mvnrepository.com/artifact/io.github.cozodb/cozo-clj)
-[![android](https://img.shields.io/maven-central/v/io.github.cozodb/cozo_android?label=android)](https://mvnrepository.com/artifact/io.github.cozodb/cozo_android)
-[![pod](https://img.shields.io/cocoapods/v/CozoSwiftBridge)](https://github.com/cozodb/cozo/tree/main/cozo-lib-swift)
-[![Go](https://img.shields.io/github/v/release/cozodb/cozo-lib-go?label=go)](https://github.com/cozodb/cozo-lib-go)
-[![C](https://img.shields.io/github/v/release/cozodb/cozo?label=C)](https://github.com/cozodb/cozo/releases)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/cozodb/cozo/build.yml?branch=main)](https://github.com/cozodb/cozo/actions/workflows/build.yml)
-[![GitHub](https://img.shields.io/github/license/cozodb/cozo)](https://github.com/cozodb/cozo/blob/main/LICENSE.txt)
+[![CI](https://github.com/lawless-m/cozo-rs/actions/workflows/build.yml/badge.svg)](https://github.com/lawless-m/cozo-rs/actions/workflows/build.yml)
+[![License](https://img.shields.io/github/license/lawless-m/cozo-rs)](https://github.com/lawless-m/cozo-rs/blob/main/LICENSE.txt)
 
-# `CozoDB`
+# `CozoDB` — maintained fork
+
+> **You probably arrived here looking for [cozodb/cozo](https://github.com/cozodb/cozo).**
+> That project has been dormant since December 2024. This is a personal maintenance fork,
+> not affiliated with the original author. The **query language, semantics, and most of
+> the core engine are unchanged** — so the [upstream documentation](https://docs.cozodb.org/)
+> and its many mirrors (readthedocs, docs.rs for published crates, etc.) still describe
+> how queries work here. What's different:
+>
+> * added a `redb` storage backend (with time travel),
+> * retired the `cozorocks` C++ FFI subcrate in favour of the pure-Rust `rocksdb` crate,
+> * fixed sled's `del()` bug and wired in time travel for sled,
+> * carries benchmark infrastructure and comprehensive CI,
+> * Rust-only — the Python, Node, Java, Clojure, Go, Swift, Android and C bindings from
+>   upstream are not maintained here; if you need those, upstream v0.7 still works.
+>
+> No support commitment, no release cadence promise. MPL-2.0, PRs welcome.
 
 ### Table of contents
 
@@ -26,44 +30,6 @@
 5. [Status of the project](#Status-of-the-project)
 6. [Links](#Links)
 7. [Licensing and contributing](#Licensing-and-contributing)
-
-## 🎉🎉🎉 New versions 🎉🎉🎉
-
-Version v0.7: after HNSW vector search from 0.6, in 0.7 we bring to you MinHash-LSH for near-duplicate search, full-text
-search, Json value support and more! See [here](https://docs.cozodb.org/en/latest/releases/v0.7.html) for more details.
-
----
-
-Version v0.6 released! This version brings vector search with HNSW indices inside Datalog, which can be integrated
-seamlessly with powerful features like ad-hoc joins, recursive Datalog and classical whole-graph algorithms. This
-significantly expanded the horizon of possibilities of CozoDB.
-
-Highlights:
-
-* You can now create HNSW (hierarchical navigable small world) indices on relations containing vectors.
-* You can create multiple HNSW indices for the same relation by specifying filters dictating which rows should be
-  indexed, or which vector(s) should be indexed for each row if the row contains multiple vectors.
-* The vector search functionality is integrated within Datalog, meaning that you can use vectors (either explicitly
-  given or coming from another relation) as pivots to perform unification into the indexed relations (roughly equivalent
-  to table joins in SQL).
-* Unification with vector search is semantically no different from regular unification, meaning that you can even use
-  vector search in recursive Datalog, enabling extremely complex query logic.
-* The HNSW index is no more than a hierarchy of proximity graphs. As an open, competent graph database, CozoDB exposes
-  these graphs to the end user to be used as regular graphs in your query, so that all the usual techniques for dealing
-  with them can now be applied, especially: community detection and other classical whole-graph algorithms.
-* As with all mutations in CozoDB, the index is protected from corruption in the face of concurrent writes by using
-  Multi-Version Concurrency Control (MVCC), and you can use multi-statement transactions for complex workflows.
-* The index resides on disk as a regular relation (unless you use the purely in-memory storage option, of course).
-  During querying, close to the absolute minimum amount of memory is used, and memory is freed as soon as the processing
-  is done (thanks to Rust's RAII), so it can run on memory-constrained systems.
-* The HNSW functionality is available for CozoDB on all platforms: in the server as a standalone service, in your
-  Python, NodeJS, or Clojure programs om embedded or client mode, on your phone in embedded mode, even in the browser
-  with the WASM backend.
-* HNSW vector search in CozoDB is performant: we have optimized the index to the point where basic vector operations
-  themselves have become a limiting factor (along with memcpy), and we are constantly finding ways to improve our new
-  implementation of the HNSW algorithm further.
-
-See [here](https://docs.cozodb.org/en/latest/releases/v0.6.html) for more details.
 
 ## Introduction
 
@@ -131,39 +97,24 @@ to get a historical view of the data.
 > for each of your relation. Every extra functionality comes
 > with its cost, and you don't want to pay the price if you don't use it.
 >
-> For the reason why you might want time travel for your data,
-> we have written a [short story](https://docs.cozodb.org/en/latest/releases/v0.4.html).
+Cozo lets you enable time travel per relation, so you only pay the cost on the data that needs it.
 
 ### How performant?
 
-On a 2020 Mac Mini with the RocksDB persistent storage engine (CozoDB supports many storage engines):
-
-* Running OLTP queries for a relation with 1.6M rows, you can expect around 100K QPS (queries per second) for mixed
-  read/write/update transactional queries, and more than 250K QPS for read-only queries, with database peak memory usage
-  around 50MB.
-* Speed for backup is around 1M rows per second, for restore is around 400K rows per second, and is insensitive to
-  relation (table) size.
-* For OLAP queries, it takes around 1 second (within a factor of 2, depending on the exact operations) to scan a table
-  with 1.6M rows. The time a query takes scales roughly with the number of rows the query touches, with memory usage
-  determined mainly by the size of the return set.
-* Two-hop graph traversal completes in less than 1ms for a graph with 1.6M vertices and 31M edges.
-* The Pagerank algorithm completes in around 50ms for a graph with 10K vertices and 120K edges, around 1 second for a
-  graph with 100K vertices and 1.7M edges, and around 30 seconds for a graph with 1.6M vertices and 32M edges.
-
-For more numbers and further details, we have a writeup
-about performance [here](https://docs.cozodb.org/en/latest/releases/v0.3.html).
+CozoDB targets embedded, single-box workloads. Recent backend benchmarks from this fork
+(`cozo-core/BENCHMARKS.md`) show redb beating sqlite on every read and aggregation workload
+by 32–49%, with time-travel aggregation over a 1M-row relation 2.35× faster. Write throughput
+is within ~6% between redb and sqlite at 1M rows. The pure-Rust rocksdb backend is roughly
+on par with redb for reads and 1.8–2.3× faster on writes than the retired `cozorocks` FFI
+build (the gain is pure FFI elimination). See `cozo-core/BENCHMARKS.md` for the numbers.
 
 ## Getting started
 
-Usually, to learn a database, you need to install it first.
-This is unnecessary for CozoDB as a testimony to its extreme embeddability, since you can run
-a complete CozoDB instance in your browser, at near-native speed for most operations!
-
-So open up the [CozoDB in WASM page](https://www.cozodb.org/wasm-demo/), and then:
-
-* Follow the [tutorial](https://docs.cozodb.org/en/latest/tutorial.html).
-
-Or you can skip ahead for the information about installing CozoDB into your favourite environment first.
+The query language reference (tutorial, execution model, built-in functions) is still hosted
+at the original upstream docs site — this fork has not replicated it. Start with the
+[tutorial](https://docs.cozodb.org/en/latest/tutorial.html), then see the
+[execution model](https://docs.cozodb.org/en/latest/execution.html). Everything there still
+applies to this fork's query engine.
 
 ### Teasers
 
@@ -256,54 +207,42 @@ CozoDB attempts to provide nice error messages when you make mistakes:
 
 ## Install
 
-We suggest that you [try out](#Getting-started) CozoDB before you install it in your environment.
+This fork targets Rust embedders first.
 
-How you install CozoDB depends on which environment you want to use it in.
-Follow the links in the table below:
+* **Rust library**: add `cozo` to your `Cargo.toml` via the workspace crate in `cozo-core/`.
+  Enable the backends you want via features: `storage-sqlite`, `storage-rocksdb`,
+  `storage-redb`, `storage-sled`. The `graph-algo` feature pulls in the built-in
+  graph algorithms.
+* **Standalone binary** (`cozo-bin/`): HTTP server + CLI for ad-hoc queries against a
+  database file. Build with `cargo build --release -p cozo-bin --features compact,storage-rocksdb`.
+* **WebAssembly** (`cozo-lib-wasm/`): in-browser build. Currently being rebuilt; don't
+  rely on it.
 
-| Language/Environment                                     | Official platform support                                                                                               | Storage |
-|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|---------|
-| [Python](https://github.com/cozodb/pycozo)               | Linux (x86_64), Mac (ARM64, x86_64), Windows (x86_64)                                                                   | MQR     |
-| [NodeJS](./cozo-lib-nodejs)                              | Linux (x86_64, ARM64), Mac (ARM64, x86_64), Windows (x86_64)                                                            | MQR     |
-| [Web browser](./cozo-lib-wasm)                           | Modern browsers supporting [web assembly](https://developer.mozilla.org/en-US/docs/WebAssembly#browser_compatibility)   | M       |
-| [Java (JVM)](https://github.com/cozodb/cozo-lib-java)    | Linux (x86_64, ARM64), Mac (ARM64, x86_64), Windows (x86_64)                                                            | MQR     |
-| [Clojure (JVM)](https://github.com/cozodb/cozo-clj)      | Linux (x86_64, ARM64), Mac (ARM64, x86_64), Windows (x86_64)                                                            | MQR     |
-| [Android](https://github.com/cozodb/cozo-lib-android)    | Android (ARM64, ARMv7, x86_64, x86)                                                                                     | MQ      |
-| [iOS/MacOS (Swift)](./cozo-lib-swift)                    | iOS (ARM64, simulators), Mac (ARM64, x86_64)                                                                            | MQ      |
-| [Rust](https://docs.rs/cozo/)                            | Source only, usable on any [platform](https://doc.rust-lang.org/nightly/rustc/platform-support.html) with `std` support | MQRST   |
-| [Golang](https://github.com/cozodb/cozo-lib-go)          | Linux (x86_64, ARM64), Mac (ARM64, x86_64), Windows (x86_64)                                                            | MQR     |
-| [C/C++/language with C FFI](./cozo-lib-c)                | Linux (x86_64, ARM64), Mac (ARM64, x86_64), Windows (x86_64)                                                            | MQR     |
-| [Standalone HTTP server](./cozo-bin)                     | Linux (x86_64, ARM64), Mac (ARM64, x86_64), Windows (x86_64)                                                            | MQRST   |
-| [Lisp](https://github.com/pegesund/cozodb-lisp)          | Linux (x86_64 so far)                                                                                                   | MR      |
-| [Smalltalk](https://github.com/Mr-Dispatch/pharo-cozodb) | Win10 & Linux (Ubuntu 23.04) x86_64 tested, MacOS should probably work                                                  | MQR     |
+Other language bindings (Python, Node, Java, Clojure, Go, Swift, Android, C) existed
+in upstream cozo and have been removed from this fork. If you need one of those, look
+at the upstream repository — the bindings there still work against upstream v0.7 and
+can be adapted to this fork's query engine if anyone wants to maintain them.
 
+### Storage backends
 
-For the storage column:
+| Feature flag        | Backend       | Notes                                                                                                     |
+|---------------------|---------------|-----------------------------------------------------------------------------------------------------------|
+| (always)            | In-memory     | Non-persistent. Fastest. Used by tests and the WASM build.                                                |
+| `storage-sqlite`    | SQLite        | Historical default. Also used as the backup/interchange format.                                           |
+| `storage-rocksdb`   | RocksDB       | Pure-Rust via the `rocksdb` crate. Highest write throughput and concurrency.                              |
+| `storage-redb`      | redb          | Pure-Rust, mmap B-tree. Wins all read and aggregation workloads vs sqlite (see `cozo-core/BENCHMARKS.md`). |
+| `storage-sled`      | sled          | Experimental; feature-complete including time travel but known to regress under large single transactions. Not recommended for production. |
 
-* M: in-memory, non-persistent backend
-* Q: [SQLite](https://www.sqlite.org/) storage backend
-* R: [RocksDB](http://rocksdb.org/) storage backend
-* S: [Sled](https://github.com/spacejam/sled) storage backend
-* T: [TiKV](https://tikv.org/) distributed storage backend
+### Tuning the RocksDB backend
 
-The [Rust doc](https://docs.rs/cozo/) has some tips on choosing storage,
-which is helpful even if you are not using Rust.
-Even if a storage/platform is not officially supported,
-you can still try to compile your version to use, maybe with some tweaks in the code.
+The RocksDB backend ships with sensible defaults (9.9-bits-per-key bloom filter with
+whole-key filtering, 9-byte prefix extractor matching CozoDB's key layout) which are
+fine for 95% of workloads.
 
-### Tuning the RocksDB backend for CozoDB
-
-RocksDB has a lot of options, and by tuning them you can achieve better performance
-for your workload. CozoDB ships with sensible defaults (bloom filters, a prefix
-extractor matched to Cozo's key layout) which are probably fine for 95% of users.
-
-Note: earlier releases of CozoDB supported dropping a RocksDB options file inside
-the database directory to override engine configuration. This feature relied on
-the bespoke `cozorocks` C++ FFI subcrate, which has been retired in favour of the
-pure-Rust `rocksdb` crate; external options-file loading is not currently wired up
-against the new backend. If CozoDB finds an `options` file in your data directory
-it will log a warning and fall back to the built-in tuning. Re-enabling this as
-a feature against the pure-Rust backend is tracked as future work.
+External RocksDB options-file loading (the "drop an `options` file in the data directory"
+escape hatch from upstream cozo) is not currently wired up against the pure-Rust backend.
+If CozoDB finds an `options` file in your data directory it logs a warning and falls back
+to the built-in tuning. Re-enabling this is tracked as future work.
 
 ## Architecture
 
@@ -322,80 +261,47 @@ with each layer only calling into the layer below:
 
 ### Storage engine
 
-The storage engine defines a storage `trait` for the storage backend, which is an interface
-with required operations, mainly the provision of a key-value store for binary data
-with range scan capabilities. There are various implementations:
+The storage engine defines a `Storage` trait — a key-value interface over binary blobs
+with range scan — and several implementations that plug into it: in-memory, SQLite,
+RocksDB, redb, and sled. A TiKV client backend exists in the tree but is not exercised
+in this fork. Rust embedders can also provide custom backends by implementing the trait.
 
-* In-memory, non-persistent backend
-* [SQLite](https://www.sqlite.org/) storage backend
-* [RocksDB](http://rocksdb.org/) storage backend
-* [Sled](https://github.com/spacejam/sled) storage backend
-* [TiKV](https://tikv.org/) distributed storage backend
+The SQLite backend also doubles as the backup/interchange file format, so you can
+move data between backends by round-tripping through a SQLite export.
 
-Depending on the build configuration, not all backends may be available
-in a binary release.
-The SQLite backend is special in that it is also used as the backup file format,
-which allows the exchange of data between databases with different backends.
-If you are using the database embedded in Rust, you can even provide your own
-custom backend.
-
-The storage engine also defines a _row-oriented_ binary data format, which the storage
-engine implementation does not need to know anything about.
-This format contains an implementation of the
-[memcomparable format](https://github.com/facebook/mysql-5.6/wiki/MyRocks-record-format#memcomparable-format)
-used for the keys, which enables the storage of rows of data as binary blobs
-that, when sorted lexicographically, give the correct order.
-This also means that data files for the SQLite backend cannot be queried with SQL
-in the usual way, and access must be through the decoding process in CozoDB.
+Keys are encoded using a [memcomparable format](https://github.com/facebook/mysql-5.6/wiki/MyRocks-record-format#memcomparable-format)
+so that byte-wise lexicographic ordering matches the intended row ordering. This is
+why a SQLite backend file can't be usefully queried with regular SQL — the blobs are
+opaque without CozoDB's decoder.
 
 ### Query engine
 
-The query engine part provides various functionalities:
-
-* function/aggregation/algorithm definitions
-* database schema
-* transaction
-* query compilation
-* query execution
-
-This part is where most of
-the code of CozoDB is concerned. The CozoScript manual [has a chapter](https://docs.cozodb.org/en/latest/execution.html)
-about the execution process.
-
-Users interact with the query engine with the [Rust API](https://docs.rs/cozo/).
-
-### Language/environment wrapper
-
-For all languages/environments except Rust, this part just translates the Rust API
-into something that can be easily consumed by the targets. For Rust, there is no wrapper.
-For example, in the case of the standalone server, the Rust API is translated
-into HTTP endpoints, whereas in the case of NodeJS, the (synchronous) Rust API
-is translated into a series of asynchronous calls from the JavaScript runtime.
-
-If you want to make CozoDB usable in other languages, this part is where your focus
-should be. Any existing generic interop libraries between Rust and your target language
-would make the job much easier. Otherwise, you can consider wrapping the C API,
-as this is supported by most languages. For the languages officially supported,
-only Golang wraps the C API directly.
+The query engine owns function/aggregation/algorithm definitions, the schema, the
+transaction layer, query compilation and execution. Embedders interact with it via
+the [Rust API](https://docs.rs/cozo/). The query language reference lives in the
+original upstream [execution docs](https://docs.cozodb.org/en/latest/execution.html).
 
 ## Status of the project
 
-CozoDB is still very young, but we encourage you to try it out for your use case.
-Any feedback is welcome.
+This is a personal maintenance fork of [cozodb/cozo](https://github.com/cozodb/cozo),
+which has been dormant since December 2024. It exists so I have a non-Neo4j graph
+database in my toolkit that I can actually keep alive: adding backends, fixing bugs,
+wiring up CI, and following interesting changes from other forks as they surface.
+
+It is not a community takeover bid and makes no promise of support, release cadence,
+or stability for anyone else. That said, the code is MPL-2.0 and PRs / issues are
+welcome if you're using it.
 
 Versions before 1.0 do not promise syntax/API stability or storage compatibility.
 
 ## Links
 
-* [Project page](https://cozodb.org/)
-* [Documentation](https://docs.cozodb.org/en/latest/)
-* [Main repo](https://github.com/cozodb/cozo)
-* [Rust doc](https://docs.rs/cozo/)
-* [Issue tracker](https://github.com/cozodb/cozo/issues)
-* [Project discussions](https://github.com/cozodb/cozo/discussions)
-* [User reddit](https://www.reddit.com/r/cozodb/)
+* [Fork repo](https://github.com/lawless-m/cozo-rs) — this repository
+* [Upstream repo (dormant)](https://github.com/cozodb/cozo) — the original CozoDB
+* [Upstream query language docs](https://docs.cozodb.org/en/latest/) — tutorial, execution model, built-in functions (still accurate for this fork)
+* [Rust API docs](https://docs.rs/cozo/) — generated from upstream's last release; this fork's docs land on docs.rs after a release
 
 ## Licensing and contributing
 
 This project is licensed under MPL-2.0 or later.
-See [here](CONTRIBUTING.md) if you are interested in contributing to the project.
+See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in contributing.
