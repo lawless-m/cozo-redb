@@ -17,6 +17,8 @@ use rand::Rng;
 use rayon::prelude::*;
 use std::cmp::max;
 use std::collections::BTreeMap;
+use std::env;
+use std::path::PathBuf;
 use std::time::Instant;
 use test::Bencher;
 
@@ -115,8 +117,19 @@ fn insert_data(db: &DbInstance) {
 
 lazy_static! {
     static ref TEST_DB: DbInstance = {
-        let db_path = "_time_travel_rocks.db";
-        let db = DbInstance::new("rocksdb", db_path, "").unwrap();
+        let engine = env::var("COZO_TEST_DB_ENGINE").unwrap_or_else(|_| "rocksdb".to_string());
+        let dir = env::var("COZO_BENCH_TT_DIR").unwrap_or_else(|_| ".".to_string());
+        let mut db_path = PathBuf::from(dir);
+        db_path.push(format!("time_travel_{}.db", engine));
+
+        if engine != "mem" {
+            let _ = std::fs::remove_file(&db_path);
+            let _ = std::fs::remove_dir_all(&db_path);
+        }
+
+        let path_str = if engine == "mem" { "".to_string() } else { db_path.to_string_lossy().into_owned() };
+        println!("time_travel bench: engine={} path={:?}", engine, path_str);
+        let db = DbInstance::new(&engine, &path_str, "").unwrap();
 
         let create_res = db.run_script(
             r#"
