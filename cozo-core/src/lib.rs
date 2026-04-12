@@ -60,10 +60,6 @@ pub use runtime::temp_store::RegularTempStore;
 pub use storage::mem::{new_cozo_mem, MemStorage};
 #[cfg(feature = "storage-redb")]
 pub use storage::re::{new_cozo_redb, RedbStorage};
-#[cfg(feature = "storage-rocksdb")]
-pub use storage::rocks::{new_cozo_rocksdb, RocksDbStorage};
-#[cfg(feature = "storage-sqlite")]
-pub use storage::sqlite::{new_cozo_sqlite, SqliteStorage};
 pub use storage::{Storage, StoreTx};
 
 pub use crate::data::expr::Expr;
@@ -102,12 +98,6 @@ pub(crate) mod utils;
 pub enum DbInstance {
     /// In memory storage (not persistent)
     Mem(Db<MemStorage>),
-    #[cfg(feature = "storage-sqlite")]
-    /// Sqlite storage
-    Sqlite(Db<SqliteStorage>),
-    #[cfg(feature = "storage-rocksdb")]
-    /// RocksDB storage
-    RocksDb(Db<RocksDbStorage>),
     #[cfg(feature = "storage-redb")]
     /// Redb storage
     Redb(Db<RedbStorage>),
@@ -124,8 +114,6 @@ impl DbInstance {
     /// The valid engines are:
     ///
     /// * `mem`
-    /// * `sqlite`
-    /// * `rocksdb`
     ///
     /// assuming all features are enabled during compilation. Otherwise only
     /// some of the engines are available. The `mem` engine is always available.
@@ -136,10 +124,6 @@ impl DbInstance {
     pub fn new(engine: &str, path: impl AsRef<Path>, _options: &str) -> Result<Self> {
         Ok(match engine {
             "mem" => Self::Mem(new_cozo_mem()?),
-            #[cfg(feature = "storage-sqlite")]
-            "sqlite" => Self::Sqlite(new_cozo_sqlite(path)?),
-            #[cfg(feature = "storage-rocksdb")]
-            "rocksdb" => Self::RocksDb(new_cozo_rocksdb(path)?),
             #[cfg(feature = "storage-redb")]
             "redb" => Self::Redb(new_cozo_redb(path)?),
             k => bail!(
@@ -161,10 +145,6 @@ impl DbInstance {
     pub fn get_fixed_rules(&self) -> BTreeMap<String, Arc<Box<dyn FixedRule>>> {
         match self {
             DbInstance::Mem(db) => db.get_fixed_rules(),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.get_fixed_rules(),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.get_fixed_rules(),
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.get_fixed_rules(),
         }
@@ -196,10 +176,6 @@ impl DbInstance {
     ) -> Result<NamedRows> {
         match self {
             DbInstance::Mem(db) => db.run_script_ast(payload, cur_vld, mutability),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.run_script_ast(payload, cur_vld, mutability),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.run_script_ast(payload, cur_vld, mutability),
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.run_script_ast(payload, cur_vld, mutability),
         }
@@ -267,10 +243,6 @@ impl DbInstance {
     {
         match self {
             DbInstance::Mem(db) => db.export_relations(relations),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.export_relations(relations),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.export_relations(relations),
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.export_relations(relations),
         }
@@ -305,10 +277,6 @@ impl DbInstance {
     pub fn import_relations(&self, data: BTreeMap<String, NamedRows>) -> Result<()> {
         match self {
             DbInstance::Mem(db) => db.import_relations(data),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.import_relations(data),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.import_relations(data),
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.import_relations(data),
         }
@@ -340,81 +308,6 @@ impl DbInstance {
             .collect::<Result<_>>()?;
         self.import_relations(mapping)
     }
-    /// Dispatcher method. See [crate::Db::backup_db].
-    pub fn backup_db(&self, out_file: impl AsRef<Path>) -> Result<()> {
-        match self {
-            DbInstance::Mem(db) => db.backup_db(out_file),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.backup_db(out_file),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.backup_db(out_file),
-            #[cfg(feature = "storage-redb")]
-            DbInstance::Redb(db) => db.backup_db(out_file),
-        }
-    }
-    /// Backup the running database into an Sqlite file, with JSON string return value.
-    /// See [crate::Db::backup_db].
-    pub fn backup_db_str(&self, out_file: impl AsRef<Path>) -> String {
-        match self.backup_db(out_file) {
-            Ok(_) => json!({"ok": true}).to_string(),
-            Err(err) => json!({"ok": false, "message": err.to_string()}).to_string(),
-        }
-    }
-    /// Dispatcher method. See [crate::Db::restore_backup].
-    pub fn restore_backup(&self, in_file: impl AsRef<Path>) -> Result<()> {
-        match self {
-            DbInstance::Mem(db) => db.restore_backup(in_file),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.restore_backup(in_file),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.restore_backup(in_file),
-            #[cfg(feature = "storage-redb")]
-            DbInstance::Redb(db) => db.restore_backup(in_file),
-        }
-    }
-    /// Restore from an Sqlite backup, with JSON string return value.
-    /// See [crate::Db::restore_backup].
-    pub fn restore_backup_str(&self, in_file: impl AsRef<Path>) -> String {
-        match self.restore_backup(in_file) {
-            Ok(_) => json!({"ok": true}).to_string(),
-            Err(err) => json!({"ok": false, "message": err.to_string()}).to_string(),
-        }
-    }
-    /// Dispatcher method. See [crate::Db::import_from_backup].
-    pub fn import_from_backup(
-        &self,
-        in_file: impl AsRef<Path>,
-        relations: &[String],
-    ) -> Result<()> {
-        match self {
-            DbInstance::Mem(db) => db.import_from_backup(in_file, relations),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.import_from_backup(in_file, relations),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.import_from_backup(in_file, relations),
-            #[cfg(feature = "storage-redb")]
-            DbInstance::Redb(db) => db.import_from_backup(in_file, relations),
-        }
-    }
-    /// Import relations from an Sqlite backup, with JSON string return value.
-    /// See [crate::Db::import_from_backup].
-    pub fn import_from_backup_str(&self, payload: &str) -> String {
-        match self.import_from_backup_str_inner(payload) {
-            Ok(_) => json!({"ok": true}).to_string(),
-            Err(err) => json!({"ok": false, "message": err.to_string()}).to_string(),
-        }
-    }
-    fn import_from_backup_str_inner(&self, payload: &str) -> Result<()> {
-        #[derive(serde_derive::Deserialize)]
-        struct Payload {
-            path: String,
-            relations: Vec<String>,
-        }
-        let json_payload: Payload = serde_json::from_str(payload).into_diagnostic()?;
-
-        self.import_from_backup(&json_payload.path, &json_payload.relations)
-    }
-
     /// Dispatcher method. See [crate::Db::register_callback].
     #[cfg(not(target_arch = "wasm32"))]
     pub fn register_callback(
@@ -424,10 +317,6 @@ impl DbInstance {
     ) -> (u32, Receiver<(CallbackOp, NamedRows, NamedRows)>) {
         match self {
             DbInstance::Mem(db) => db.register_callback(relation, capacity),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.register_callback(relation, capacity),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.register_callback(relation, capacity),
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.register_callback(relation, capacity),
         }
@@ -438,10 +327,6 @@ impl DbInstance {
     pub fn unregister_callback(&self, id: u32) -> bool {
         match self {
             DbInstance::Mem(db) => db.unregister_callback(id),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.unregister_callback(id),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.unregister_callback(id),
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.unregister_callback(id),
         }
@@ -453,10 +338,6 @@ impl DbInstance {
     {
         match self {
             DbInstance::Mem(db) => db.register_fixed_rule(name, rule_impl),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.register_fixed_rule(name, rule_impl),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.register_fixed_rule(name, rule_impl),
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.register_fixed_rule(name, rule_impl),
         }
@@ -465,10 +346,6 @@ impl DbInstance {
     pub fn unregister_fixed_rule(&self, name: &str) -> Result<bool> {
         match self {
             DbInstance::Mem(db) => db.unregister_fixed_rule(name),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.unregister_fixed_rule(name),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.unregister_fixed_rule(name),
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.unregister_fixed_rule(name),
         }
@@ -483,10 +360,6 @@ impl DbInstance {
     ) {
         match self {
             DbInstance::Mem(db) => db.run_multi_transaction(write, payloads, results),
-            #[cfg(feature = "storage-sqlite")]
-            DbInstance::Sqlite(db) => db.run_multi_transaction(write, payloads, results),
-            #[cfg(feature = "storage-rocksdb")]
-            DbInstance::RocksDb(db) => db.run_multi_transaction(write, payloads, results),
             #[cfg(feature = "storage-redb")]
             DbInstance::Redb(db) => db.run_multi_transaction(write, payloads, results),
         }

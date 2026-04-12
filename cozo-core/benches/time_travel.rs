@@ -100,7 +100,7 @@ fn insert_data(db: &DbInstance) {
 
 lazy_static! {
     static ref TEST_DB: DbInstance = {
-        let engine = env::var("COZO_TEST_DB_ENGINE").unwrap_or_else(|_| "rocksdb".to_string());
+        let engine = env::var("COZO_TEST_DB_ENGINE").unwrap_or_else(|_| "redb".to_string());
         let dir = env::var("COZO_BENCH_TT_DIR").unwrap_or_else(|_| ".".to_string());
         let mut db_path = PathBuf::from(dir);
         db_path.push(format!("time_travel_{}.db", engine));

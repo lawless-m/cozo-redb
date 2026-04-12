@@ -15,35 +15,18 @@ env:
 
 jobs:
   test:
-    name: test (${{ matrix.backend }})
+    name: test
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        backend:
-          - sqlite
-          - rocksdb
-          - redb
-          - all
-        include:
-          - backend: sqlite
-            features: graph-algo,storage-sqlite
-          - backend: rocksdb
-            features: graph-algo,storage-rocksdb
-          - backend: redb
-            features: graph-algo,storage-redb
-          - backend: all
-            features: graph-algo,storage-sqlite,storage-rocksdb,storage-redb
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: test-${{ matrix.backend }}
+          key: test
       - name: Build
-        run: cargo build -p cozo --no-default-features --features ${{ matrix.features }}
+        run: cargo build -p cozo --no-default-features --features graph-algo,storage-redb
       - name: Test
-        run: cargo test -p cozo --no-default-features --features ${{ matrix.features }} --lib
+        run: cargo test -p cozo --no-default-features --features graph-algo,storage-redb --lib
 
   cross-platform:
     name: cross (${{ matrix.os }})
@@ -59,9 +42,9 @@ jobs:
         with:
           key: cross-${{ matrix.os }}
       - name: Build
-        run: cargo build -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb
+        run: cargo build -p cozo --no-default-features --features graph-algo,storage-redb
       - name: Test
-        run: cargo test -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb --lib
+        run: cargo test -p cozo --no-default-features --features graph-algo,storage-redb --lib
 
   cozo-bin:
     name: cozo-bin
@@ -72,7 +55,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: cozo-bin
-      - run: cargo check -p cozo-bin --no-default-features --features compact,storage-rocksdb
+      - run: cargo check -p cozo-bin
 
   docs:
     name: docs
@@ -85,7 +68,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: docs
-      - run: cargo doc --no-deps -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb,storage-redb
+      - run: cargo doc --no-deps -p cozo --no-default-features --features graph-algo,storage-redb
 
   fmt:
     name: fmt
@@ -109,4 +92,4 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: clippy
-      - run: cargo clippy -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb,storage-redb
+      - run: cargo clippy -p cozo --no-default-features --features graph-algo,storage-redb

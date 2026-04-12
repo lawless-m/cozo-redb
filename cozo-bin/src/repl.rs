@@ -64,7 +64,7 @@ impl rustyline::validate::Validator for Indented {
 
 #[derive(Args, Debug)]
 pub(crate) struct ReplArgs {
-    /// Database engine, can be `mem`, `sqlite`, `rocksdb` and others.
+    /// Database engine: `mem` (non-persistent) or `redb` (persistent).
     #[clap(short, long, default_value_t = String::from("mem"))]
     engine: String,
 
@@ -238,14 +238,6 @@ fn process_line(
                 let display = serde_json::to_string_pretty(&json!(&params)).into_diagnostic()?;
                 println!("{display}");
             }
-            "backup" => {
-                let path = payload.trim();
-                if path.is_empty() {
-                    bail!("Backup requires a path");
-                };
-                db.backup_db(path)?;
-                println!("Backup written successfully to {path}")
-            }
             "run" => {
                 let path = payload.trim();
                 if path.is_empty() {
@@ -254,14 +246,6 @@ fn process_line(
                 let content = fs::read_to_string(path).into_diagnostic()?;
                 let out = db.run_script(&content, params.clone(), ScriptMutability::Mutable)?;
                 process_out(out)?;
-            }
-            "restore" => {
-                let path = payload.trim();
-                if path.is_empty() {
-                    bail!("Restore requires a path");
-                };
-                db.restore_backup(path)?;
-                println!("Backup successfully loaded from {path}")
             }
             "save" => {
                 let next_path = payload.trim();

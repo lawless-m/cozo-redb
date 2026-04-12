@@ -10,14 +10,24 @@
 > not affiliated with the original author. The **query language, semantics, and most of
 > the core engine are unchanged** — so the [upstream documentation](https://docs.cozodb.org/)
 > and its many mirrors (readthedocs, docs.rs for published crates, etc.) still describe
-> how queries work here. What's different:
+> how queries work here.
 >
-> * added a `redb` storage backend (with time travel),
-> * retired the `cozorocks` C++ FFI subcrate in favour of the pure-Rust `rocksdb` crate,
-> * dropped the `sled` backend (read perf regressed 6× between smoke and medium scale in benchmarks; unreliable for production),
-> * carries benchmark infrastructure and comprehensive CI,
-> * Rust-only — the Python, Node, Java, Clojure, Go, Swift, Android and C bindings from
->   upstream are not maintained here; if you need those, upstream v0.7 still works.
+> The fork is **pure Rust, redb-backed, tight and focused.** In one long day it was
+> stripped of:
+>
+> * the `cozorocks` C++ FFI subcrate and its 42 MB vendored `librocksdb` submodule;
+> * the `sled`, `tikv`, `sqlite`, and `rocksdb` storage backends;
+> * the `backup_db` / `restore_backup` / `import_from_backup` API surface (since it
+>   was sqlite-coupled — to back up a redb database, close it and copy the file);
+> * the Python, Node, Java, Swift, and C language bindings (upstream v0.7 still has
+>   them if you need them).
+>
+> What was added: a pure-Rust `redb` storage backend with time travel, benchmark
+> infrastructure that actually runs, and a CI pipeline covering build / cross-platform /
+> docs / fmt / clippy / audit / dependabot.
+>
+> Remaining backends: **`mem`** (in-process, non-persistent) and **`redb`** (pure-Rust
+> mmap B-tree, persistent, ACID, supports time travel). That's it.
 >
 > No support commitment, no release cadence promise. MPL-2.0, PRs welcome.
 
@@ -101,12 +111,10 @@ Cozo lets you enable time travel per relation, so you only pay the cost on the d
 
 ### How performant?
 
-CozoDB targets embedded, single-box workloads. Recent backend benchmarks from this fork
-(`cozo-core/BENCHMARKS.md`) show redb beating sqlite on every read and aggregation workload
-by 32–49%, with time-travel aggregation over a 1M-row relation 2.35× faster. Write throughput
-is within ~6% between redb and sqlite at 1M rows. The pure-Rust rocksdb backend is roughly
-on par with redb for reads and 1.8–2.3× faster on writes than the retired `cozorocks` FFI
-build (the gain is pure FFI elimination). See `cozo-core/BENCHMARKS.md` for the numbers.
+This fork targets embedded, single-box workloads. On the retired multi-backend version,
+benchmarks (`cozo-core/BENCHMARKS.md`) showed redb beating sqlite on every read and
+aggregation workload by 32–49%, with time-travel aggregation over a 1M-row relation
+2.35× faster, which is why redb was kept as the sole persistent backend.
 
 ## Getting started
 
@@ -207,40 +215,25 @@ CozoDB attempts to provide nice error messages when you make mistakes:
 
 ## Install
 
-This fork targets Rust embedders first.
+This fork targets Rust embedders.
 
 * **Rust library**: add `cozo` to your `Cargo.toml` via the workspace crate in `cozo-core/`.
-  Enable the backends you want via features: `storage-sqlite`, `storage-rocksdb`,
-  `storage-redb`. The `graph-algo` feature pulls in the built-in graph algorithms.
+  Default features are `compact` = `storage-redb` + `requests` + `graph-algo`; that's
+  almost certainly what you want.
 * **Standalone binary** (`cozo-bin/`): HTTP server + CLI for ad-hoc queries against a
-  database file. Build with `cargo build --release -p cozo-bin --features compact,storage-rocksdb`.
+  redb database file. Build with `cargo build --release -p cozo-bin`.
 * **WebAssembly** (`cozo-lib-wasm/`): in-browser build. Currently being rebuilt; don't
   rely on it.
 
-Other language bindings (Python, Node, Java, Clojure, Go, Swift, Android, C) existed
-in upstream cozo and have been removed from this fork. If you need one of those, look
-at the upstream repository — the bindings there still work against upstream v0.7 and
-can be adapted to this fork's query engine if anyone wants to maintain them.
+### Backup and restore
 
-### Storage backends
+There is no in-process `backup_db` / `restore_backup` API. To back up a redb database,
+close it and copy the `.redb` file with your usual backup tool (`cp`, `rsync`, `restic`, etc).
+To restore, copy the file back. This is a deliberate simplification — redb is a single
+file and "copy the file" is a perfectly good backup strategy.
 
-| Feature flag        | Backend       | Notes                                                                                                     |
-|---------------------|---------------|-----------------------------------------------------------------------------------------------------------|
-| (always)            | In-memory     | Non-persistent. Fastest. Used by tests and the WASM build.                                                |
-| `storage-sqlite`    | SQLite        | Historical default. Also used as the backup/interchange format.                                           |
-| `storage-rocksdb`   | RocksDB       | Pure-Rust via the `rocksdb` crate. Highest write throughput and concurrency.                              |
-| `storage-redb`      | redb          | Pure-Rust, mmap B-tree. Wins all read and aggregation workloads vs sqlite (see `cozo-core/BENCHMARKS.md`). Recommended default. |
-
-### Tuning the RocksDB backend
-
-The RocksDB backend ships with sensible defaults (9.9-bits-per-key bloom filter with
-whole-key filtering, 9-byte prefix extractor matching CozoDB's key layout) which are
-fine for 95% of workloads.
-
-External RocksDB options-file loading (the "drop an `options` file in the data directory"
-escape hatch from upstream cozo) is not currently wired up against the pure-Rust backend.
-If CozoDB finds an `options` file in your data directory it logs a warning and falls back
-to the built-in tuning. Re-enabling this is tracked as future work.
+(The old upstream backup mechanism relied on sqlite as an intermediate format;
+when sqlite was dropped from this fork, the backup API went with it.)
 
 ## Architecture
 
@@ -260,17 +253,12 @@ with each layer only calling into the layer below:
 ### Storage engine
 
 The storage engine defines a `Storage` trait — a key-value interface over binary blobs
-with range scan — and several implementations that plug into it: in-memory, SQLite,
-RocksDB, and redb. Rust embedders can also provide custom backends by implementing
-the trait.
-
-The SQLite backend also doubles as the backup/interchange file format, so you can
-move data between backends by round-tripping through a SQLite export.
+with range scan — and two implementations that plug into it: **in-memory** (for tests
+and the WASM build) and **redb** (the single persistent backend). Rust embedders can
+also provide custom backends by implementing the trait.
 
 Keys are encoded using a [memcomparable format](https://github.com/facebook/mysql-5.6/wiki/MyRocks-record-format#memcomparable-format)
-so that byte-wise lexicographic ordering matches the intended row ordering. This is
-why a SQLite backend file can't be usefully queried with regular SQL — the blobs are
-opaque without CozoDB's decoder.
+so that byte-wise lexicographic ordering matches the intended row ordering.
 
 ### Query engine
 

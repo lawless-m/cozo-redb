@@ -16,10 +16,6 @@ use crate::decode_tuple_from_kv;
 pub(crate) mod mem;
 #[cfg(feature = "storage-redb")]
 pub(crate) mod re;
-#[cfg(feature = "storage-rocksdb")]
-pub(crate) mod rocks;
-#[cfg(feature = "storage-sqlite")]
-pub(crate) mod sqlite;
 pub(crate) mod temp;
 
 /// Swappable storage trait for Cozo's storage engine

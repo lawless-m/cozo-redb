@@ -24,7 +24,7 @@ use clap::Args;
 use futures::future::BoxFuture;
 use futures::stream::Stream;
 use itertools::Itertools;
-use log::{error, info, warn};
+use log::{info, warn};
 use miette::miette;
 // use miette::miette;
 use rand::Rng;
@@ -42,17 +42,13 @@ use cozo::{
 
 #[derive(Args, Debug)]
 pub(crate) struct ServerArgs {
-    /// Database engine, can be `mem`, `sqlite`, `rocksdb` and others.
+    /// Database engine: `mem` (non-persistent) or `redb` (persistent).
     #[clap(short, long, default_value_t = String::from("mem"))]
     engine: String,
 
     /// Path to the directory to store the database
     #[clap(short, long, default_value_t = String::from("cozo.db"))]
     path: String,
-
-    /// Restore from the specified backup before starting the server
-    #[clap(long)]
-    restore: Option<String>,
 
     /// Extra config in JSON format
     #[clap(short, long, default_value_t = String::from("{}"))]
@@ -192,13 +188,6 @@ fn x() {}
 
 pub(crate) async fn server_main(args: ServerArgs) {
     let db = DbInstance::new(&args.engine, &args.path, &args.config).unwrap();
-    if let Some(p) = &args.restore {
-        if let Err(err) = db.restore_backup(p) {
-            error!("{}", err);
-            error!("Restore from backup failed, terminate");
-            panic!()
-        }
-    }
 
     let skip_auth = args.bind == "127.0.0.1";
 
@@ -246,8 +235,6 @@ pub(crate) async fn server_main(args: ServerArgs) {
         .route("/text-query", post(text_query))
         .route("/export/:relations", get(export_relations))
         .route("/import", put(import_relations))
-        .route("/backup", post(backup))
-        .route("/import-from-backup", post(import_from_backup))
         .route("/changes/:relation", get(observe_changes))
         .route("/rules/:name", get(register_rule))
         .route(
@@ -459,56 +446,6 @@ async fn import_relations(
     let result = spawn_blocking(move || st.db.import_relations(payload)).await;
     match result {
         Ok(Ok(_)) => (StatusCode::OK, json!({"ok": true}).into()),
-        Ok(Err(err)) => {
-            let ret = json!({"ok": false, "message": err.to_string()});
-            (StatusCode::BAD_REQUEST, ret.into())
-        }
-        Err(err) => internal_error(err),
-    }
-}
-
-#[derive(serde_derive::Deserialize)]
-struct BackupPayload {
-    path: String,
-}
-
-async fn backup(
-    State(st): State<DbState>,
-    Json(payload): Json<BackupPayload>,
-) -> (StatusCode, Json<serde_json::Value>) {
-    let result = spawn_blocking(move || st.db.backup_db(payload.path)).await;
-
-    match result {
-        Ok(Ok(())) => {
-            let ret = json!({"ok": true});
-            (StatusCode::OK, ret.into())
-        }
-        Ok(Err(err)) => {
-            let ret = json!({"ok": false, "message": err.to_string()});
-            (StatusCode::BAD_REQUEST, ret.into())
-        }
-        Err(err) => internal_error(err),
-    }
-}
-
-#[derive(serde_derive::Deserialize)]
-struct BackupImportPayload {
-    path: String,
-    relations: Vec<String>,
-}
-
-async fn import_from_backup(
-    State(st): State<DbState>,
-    Json(payload): Json<BackupImportPayload>,
-) -> (StatusCode, Json<serde_json::Value>) {
-    let result =
-        spawn_blocking(move || st.db.import_from_backup(&payload.path, &payload.relations)).await;
-
-    match result {
-        Ok(Ok(())) => {
-            let ret = json!({"ok": true});
-            (StatusCode::OK, ret.into())
-        }
         Ok(Err(err)) => {
             let ret = json!({"ok": false, "message": err.to_string()});
             (StatusCode::BAD_REQUEST, ret.into())
