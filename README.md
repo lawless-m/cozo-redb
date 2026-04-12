@@ -1,5 +1,3 @@
-<img src="static/logo_c.png" width="200" height="175" alt="Logo">
-
 [![CI](https://github.com/lawless-m/cozo-redb/actions/workflows/build.yml/badge.svg)](https://github.com/lawless-m/cozo-redb/actions/workflows/build.yml)
 [![License](https://img.shields.io/github/license/lawless-m/cozo-redb)](https://github.com/lawless-m/cozo-redb/blob/main/LICENSE.txt)
 
@@ -11,9 +9,11 @@
 > Ziyang Hu's transactional Datalog database, which has been dormant since December 2024.
 > This fork picks **redb** (a pure-Rust mmap B-tree) as its single persistent backend and
 > deletes everything else. The query language, Datalog semantics, time-travel relations,
-> HNSW vector search, MinHash-LSH, and full-text index are all inherited unchanged from
-> upstream — the [upstream documentation](https://docs.cozodb.org/) and its mirrors
-> (readthedocs, docs.rs for upstream crates) still describe how queries work here.
+> and HNSW vector search are inherited unchanged from upstream; the full-text index has
+> been modified, and MinHash-LSH has been removed entirely. The
+> [upstream documentation](https://docs.cozodb.org/) and its mirrors (readthedocs, docs.rs
+> for upstream crates) still describe much of how queries work here, though they are no
+> longer perfectly in step with this fork.
 >
 > This is not a takeover bid or a bid for the upstream name. It's a personal maintenance
 > furrow with a specific angle: **redb is the interesting backend upstream never shipped,
@@ -64,10 +64,10 @@ if you can use it on a phone which _never_ connects to any network
 > This is in contradistinction to _client-server_ databases, where your program connects to
 > a database server (maybe running on a separate machine) via a client library. Embedded databases
 > generally require no setup and can be used in a much wider range of environments.
->
-> We say CozoDB is _embeddable_ instead of _embedded_ since you can also use it in client-server
-> mode, which can make better use of server resources and allow much more concurrency than
-> in embedded mode.
+
+Upstream CozoDB also offered a client-server mode via an HTTP server; **this fork is
+embedded-only** — the HTTP server has been removed along with the other non-redb
+backends, and `cozo-redb` runs exclusively in the same process as your program.
 
 ### Why _graphs_?
 
@@ -127,8 +127,10 @@ aggregation workload by 32–49%, with time-travel aggregation over a 1M-row rel
 The query language reference (tutorial, execution model, built-in functions) is still hosted
 at the original upstream docs site — this fork has not replicated it. Start with the
 [tutorial](https://docs.cozodb.org/en/latest/tutorial.html), then see the
-[execution model](https://docs.cozodb.org/en/latest/execution.html). Everything there still
-applies to this fork's query engine.
+[execution model](https://docs.cozodb.org/en/latest/execution.html). Most of what is
+described there still applies to this fork's query engine, but mind that the full-text
+index has been modified and MinHash-LSH has been removed altogether; the upstream pages
+covering those are no longer accurate here.
 
 ### Teasers
 
@@ -226,7 +228,7 @@ This fork targets Rust embedders.
 * **Rust library**: add `cozo` to your `Cargo.toml` via the workspace crate in `cozo-core/`.
   Default features are `compact` = `storage-redb` + `requests` + `graph-algo`; that's
   almost certainly what you want.
-* **Standalone binary** (`cozo-bin/`): HTTP server + CLI for ad-hoc queries against a
+* **Standalone binary** (`cozo-bin/`): CLI and REPL for ad-hoc queries against a
   redb database file. Build with `cargo build --release -p cozo-bin`.
 * **WebAssembly** (`cozo-lib-wasm/`): in-browser build. Currently being rebuilt; don't
   rely on it.
@@ -260,8 +262,7 @@ with each layer only calling into the layer below:
 
 The storage engine defines a `Storage` trait — a key-value interface over binary blobs
 with range scan — and two implementations that plug into it: **in-memory** (for tests
-and the WASM build) and **redb** (the single persistent backend). Rust embedders can
-also provide custom backends by implementing the trait.
+and the WASM build) and **redb** (the single persistent backend).
 
 Keys are encoded using a [memcomparable format](https://github.com/facebook/mysql-5.6/wiki/MyRocks-record-format#memcomparable-format)
 so that byte-wise lexicographic ordering matches the intended row ordering.
@@ -289,7 +290,7 @@ Versions before 1.0 do not promise syntax/API stability or storage compatibility
 
 * [Fork repo](https://github.com/lawless-m/cozo-redb) — this repository
 * [Upstream repo (dormant)](https://github.com/cozodb/cozo) — the original CozoDB
-* [Upstream query language docs](https://docs.cozodb.org/en/latest/) — tutorial, execution model, built-in functions (still accurate for this fork)
+* [Upstream query language docs](https://docs.cozodb.org/en/latest/) — tutorial, execution model, built-in functions (mostly accurate for this fork; full-text has been modified and MinHash-LSH removed)
 * [Rust API docs](https://docs.rs/cozo/) — generated from upstream's last release; this fork's docs land on docs.rs after a release
 
 ## Licensing and contributing
