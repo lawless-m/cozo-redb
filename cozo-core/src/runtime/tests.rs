@@ -394,43 +394,6 @@ fn test_trigger() {
 }
 
 #[test]
-fn test_callback() {
-    let db = new_cozo_mem().unwrap();
-    let mut collected = vec![];
-    let (_id, receiver) = db.register_callback("friends", None);
-    db.run_default(":create friends {fr: Int, to: Int => data: Any}")
-        .unwrap();
-    db.run_default(r"?[fr, to, data] <- [[1,2,3],[4,5,6]] :put friends {fr, to => data}")
-        .unwrap();
-    db.run_default(r"?[fr, to, data] <- [[1,2,4],[4,7,6]] :put friends {fr, to => data}")
-        .unwrap();
-    db.run_default(r"?[fr, to] <- [[1,9],[4,5]] :rm friends {fr, to}")
-        .unwrap();
-    std::thread::sleep(Duration::from_secs_f64(0.01));
-    while let Ok(d) = receiver.try_recv() {
-        collected.push(d);
-    }
-    let collected = collected;
-    assert_eq!(collected[0].0, CallbackOp::Put);
-    assert_eq!(collected[0].1.rows.len(), 2);
-    assert_eq!(collected[0].1.rows[0].len(), 3);
-    assert_eq!(collected[0].2.rows.len(), 0);
-    assert_eq!(collected[1].0, CallbackOp::Put);
-    assert_eq!(collected[1].1.rows.len(), 2);
-    assert_eq!(collected[1].1.rows[0].len(), 3);
-    assert_eq!(collected[1].2.rows.len(), 1);
-    assert_eq!(
-        collected[1].2.rows[0],
-        vec![DataValue::from(1), DataValue::from(2), DataValue::from(3)]
-    );
-    assert_eq!(collected[2].0, CallbackOp::Rm);
-    assert_eq!(collected[2].1.rows.len(), 2);
-    assert_eq!(collected[2].1.rows[0].len(), 2);
-    assert_eq!(collected[2].2.rows.len(), 1);
-    assert_eq!(collected[2].2.rows[0].len(), 3);
-}
-
-#[test]
 fn test_update() {
     let db = new_cozo_mem().unwrap();
     db.run_default(":create friends {fr: Int, to: Int => a: Any, b: Any, c: Any}")

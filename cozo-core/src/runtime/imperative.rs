@@ -38,7 +38,6 @@ impl<'s, S: Storage<'s>> Db<S> {
         tx: &mut SessionTx<'_>,
         cleanups: &mut Vec<(Vec<u8>, Vec<u8>)>,
         cur_vld: ValidityTs,
-        callback_targets: &BTreeSet<SmartString<LazyCompact>>,
         callback_collector: &mut CallbackCollector,
     ) -> Result<bool> {
         let res = match p {
@@ -51,7 +50,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                 tx,
                 cleanups,
                 cur_vld,
-                callback_targets,
                 callback_collector,
             )?,
         };
@@ -69,7 +67,6 @@ impl<'s, S: Storage<'s>> Db<S> {
         tx: &mut SessionTx<'_>,
         cleanups: &mut Vec<(Vec<u8>, Vec<u8>)>,
         cur_vld: ValidityTs,
-        callback_targets: &BTreeSet<SmartString<LazyCompact>>,
         callback_collector: &mut CallbackCollector,
         poison: &Poison,
         readonly: bool,
@@ -96,7 +93,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                                 tx,
                                 cleanups,
                                 cur_vld,
-                                callback_targets,
                                 callback_collector,
                             )?,
                             Right(rel) => {
@@ -131,7 +127,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                         tx,
                         cleanups,
                         cur_vld,
-                        callback_targets,
                         callback_collector,
                     )?;
                     if let Some(store_as) = &prog.store_as {
@@ -144,7 +139,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                         tx,
                         cleanups,
                         cur_vld,
-                        callback_targets,
                         callback_collector,
                     ) {
                         Ok(res) => {
@@ -173,7 +167,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                         tx,
                         cleanups,
                         cur_vld,
-                        callback_targets,
                         callback_collector,
                     )?;
                     let cond_val = if *negated { !cond_val } else { cond_val };
@@ -183,7 +176,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                         tx,
                         cleanups,
                         cur_vld,
-                        callback_targets,
                         callback_collector,
                         poison,
                         readonly,
@@ -204,7 +196,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                             tx,
                             cleanups,
                             cur_vld,
-                            callback_targets,
                             callback_collector,
                             poison,
                             readonly,
@@ -270,11 +261,6 @@ impl<'s, S: Storage<'s>> Db<S> {
         let write_lock = self.obtain_relation_locks(write_lock_names.iter());
         let _write_lock_guards = write_lock.iter().map(|l| l.read().unwrap()).collect_vec();
 
-        let callback_targets = if is_write {
-            self.current_callback_targets()
-        } else {
-            Default::default()
-        };
         let mut cleanups: Vec<(Vec<u8>, Vec<u8>)> = vec![];
         let ret;
         {
@@ -303,7 +289,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                 &mut tx,
                 &mut cleanups,
                 cur_vld,
-                &callback_targets,
                 &mut callback_collector,
                 &poison,
                 readonly,
@@ -329,10 +314,6 @@ impl<'s, S: Storage<'s>> Db<S> {
             }
 
             tx.commit_tx()?;
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        if !callback_collector.is_empty() {
-            self.send_callbacks(callback_collector)
         }
 
         Ok(ret)
@@ -389,7 +370,6 @@ impl SessionTx<'_> {
             &meta,
             &headers,
             cur_vld,
-            &Default::default(),
             &mut Default::default(),
             true,
             "",

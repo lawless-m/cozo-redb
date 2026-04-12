@@ -49,7 +49,6 @@ impl<'a> SessionTx<'a> {
         meta: &InputRelationHandle,
         headers: &[Symbol],
         cur_vld: ValidityTs,
-        callback_targets: &BTreeSet<SmartString<LazyCompact>>,
         callback_collector: &mut CallbackCollector,
         propagate_triggers: bool,
         force_collect: &str,
@@ -96,7 +95,6 @@ impl<'a> SessionTx<'a> {
                             self,
                             program,
                             cur_vld,
-                            callback_targets,
                             callback_collector,
                             false,
                         )
@@ -138,7 +136,6 @@ impl<'a> SessionTx<'a> {
                 res_iter,
                 headers,
                 cur_vld,
-                callback_targets,
                 callback_collector,
                 propagate_triggers,
                 &mut to_clear,
@@ -172,7 +169,6 @@ impl<'a> SessionTx<'a> {
                 res_iter,
                 headers,
                 cur_vld,
-                callback_targets,
                 callback_collector,
                 propagate_triggers,
                 &mut to_clear,
@@ -188,7 +184,6 @@ impl<'a> SessionTx<'a> {
                     res_iter,
                     headers,
                     cur_vld,
-                    callback_targets,
                     callback_collector,
                     propagate_triggers,
                     &mut to_clear,
@@ -211,7 +206,6 @@ impl<'a> SessionTx<'a> {
         res_iter: impl Iterator<Item = Tuple>,
         headers: &[Symbol],
         cur_vld: ValidityTs,
-        callback_targets: &BTreeSet<SmartString<LazyCompact>>,
         callback_collector: &mut CallbackCollector,
         propagate_triggers: bool,
         to_clear: &mut Vec<(Vec<u8>, Vec<u8>)>,
@@ -224,7 +218,7 @@ impl<'a> SessionTx<'a> {
         span: SourceSpan,
     ) -> Result<()> {
         let is_callback_target =
-            callback_targets.contains(&relation_store.name) || force_collect == relation_store.name;
+            force_collect == relation_store.name;
 
         if relation_store.access_level < AccessLevel::Protected {
             bail!(InsufficientAccessLevel(
@@ -355,7 +349,6 @@ impl<'a> SessionTx<'a> {
             self.collect_mutations(
                 db,
                 cur_vld,
-                callback_targets,
                 callback_collector,
                 propagate_triggers,
                 to_clear,
@@ -523,7 +516,6 @@ impl<'a> SessionTx<'a> {
         res_iter: impl Iterator<Item = Tuple>,
         headers: &[Symbol],
         cur_vld: ValidityTs,
-        callback_targets: &BTreeSet<SmartString<LazyCompact>>,
         callback_collector: &mut CallbackCollector,
         propagate_triggers: bool,
         to_clear: &mut Vec<(Vec<u8>, Vec<u8>)>,
@@ -534,7 +526,7 @@ impl<'a> SessionTx<'a> {
         span: SourceSpan,
     ) -> Result<()> {
         let is_callback_target =
-            callback_targets.contains(&relation_store.name) || force_collect == relation_store.name;
+            force_collect == relation_store.name;
 
         if relation_store.access_level < AccessLevel::Protected {
             bail!(InsufficientAccessLevel(
@@ -653,7 +645,6 @@ impl<'a> SessionTx<'a> {
             self.collect_mutations(
                 db,
                 cur_vld,
-                callback_targets,
                 callback_collector,
                 propagate_triggers,
                 to_clear,
@@ -670,7 +661,6 @@ impl<'a> SessionTx<'a> {
         &mut self,
         db: &Db<S>,
         cur_vld: ValidityTs,
-        callback_targets: &BTreeSet<SmartString<LazyCompact>>,
         callback_collector: &mut CallbackCollector,
         propagate_triggers: bool,
         to_clear: &mut Vec<(Vec<u8>, Vec<u8>)>,
@@ -721,7 +711,6 @@ impl<'a> SessionTx<'a> {
                         self,
                         program,
                         cur_vld,
-                        callback_targets,
                         callback_collector,
                         false,
                     )
@@ -917,7 +906,6 @@ impl<'a> SessionTx<'a> {
         res_iter: impl Iterator<Item = Tuple>,
         headers: &[Symbol],
         cur_vld: ValidityTs,
-        callback_targets: &BTreeSet<SmartString<LazyCompact>>,
         callback_collector: &mut CallbackCollector,
         propagate_triggers: bool,
         to_clear: &mut Vec<(Vec<u8>, Vec<u8>)>,
@@ -929,7 +917,7 @@ impl<'a> SessionTx<'a> {
         span: SourceSpan,
     ) -> Result<()> {
         let is_callback_target =
-            callback_targets.contains(&relation_store.name) || force_collect == relation_store.name;
+            force_collect == relation_store.name;
 
         if relation_store.access_level < AccessLevel::Protected {
             bail!(InsufficientAccessLevel(
@@ -1059,7 +1047,6 @@ impl<'a> SessionTx<'a> {
                             self,
                             program,
                             cur_vld,
-                            callback_targets,
                             callback_collector,
                             false,
                         )

@@ -46,10 +46,7 @@ use crate::query::ra::{
     FilteredRA, FtsSearchRA, HnswSearchRA, InnerJoin, LshSearchRA, NegJoin, RelAlgebra, ReorderRA,
     StoredRA, StoredWithValidityRA, TempStoreRA, UnificationRA,
 };
-#[allow(unused_imports)]
-use crate::runtime::callback::{
-    CallbackCollector, CallbackDeclaration, CallbackOp, EventCallbackRegistry,
-};
+use crate::runtime::callback::CallbackCollector;
 use crate::runtime::relation::{
     extend_tuple_from_v, AccessLevel, InsufficientAccessLevel, RelationHandle, RelationId,
 };
@@ -101,10 +98,6 @@ pub struct Db<S> {
     pub(crate) running_queries: Arc<Mutex<BTreeMap<u64, RunningQueryHandle>>>,
     pub(crate) fixed_rules: Arc<ShardedLock<BTreeMap<String, Arc<Box<dyn FixedRule>>>>>,
     pub(crate) tokenizers: Arc<TokenizerCache>,
-    #[cfg(not(target_arch = "wasm32"))]
-    callback_count: Arc<AtomicU32>,
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) event_callbacks: Arc<ShardedLock<EventCallbackRegistry>>,
     relation_locks: Arc<ShardedLock<BTreeMap<SmartString<LazyCompact>, Arc<ShardedLock<()>>>>>,
 }
 
@@ -261,11 +254,6 @@ impl<'s, S: Storage<'s>> Db<S> {
             running_queries: Default::default(),
             fixed_rules: Arc::new(ShardedLock::new(DEFAULT_FIXED_RULES.clone())),
             tokenizers: Arc::new(Default::default()),
-            #[cfg(not(target_arch = "wasm32"))]
-            callback_count: Default::default(),
-            // callback_receiver: Arc::new(receiver),
-            #[cfg(not(target_arch = "wasm32"))]
-            event_callbacks: Default::default(),
             relation_locks: Default::default(),
         };
         Ok(ret)
@@ -548,51 +536,6 @@ impl<'s, S: Storage<'s>> Db<S> {
         Ok(self.fixed_rules.write().unwrap().remove(name).is_some())
     }
 
-    /// Register callback channel to receive changes when the requested relation are successfully committed.
-    /// The returned ID can be used to unregister the callback channel.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn register_callback(
-        &self,
-        relation: &str,
-        capacity: Option<usize>,
-    ) -> (u32, Receiver<(CallbackOp, NamedRows, NamedRows)>) {
-        let (sender, receiver) = if let Some(c) = capacity {
-            bounded(c)
-        } else {
-            unbounded()
-        };
-        let cb = CallbackDeclaration {
-            dependent: SmartString::from(relation),
-            sender,
-        };
-
-        let mut guard = self.event_callbacks.write().unwrap();
-        let new_id = self.callback_count.fetch_add(1, Ordering::SeqCst);
-        guard
-            .1
-            .entry(SmartString::from(relation))
-            .or_default()
-            .insert(new_id);
-
-        guard.0.insert(new_id, cb);
-        (new_id, receiver)
-    }
-
-    /// Unregister callbacks/channels to run when changes to relations are committed.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn unregister_callback(&self, id: u32) -> bool {
-        let mut guard = self.event_callbacks.write().unwrap();
-        let ret = guard.0.remove(&id);
-        if let Some(cb) = &ret {
-            guard.1.get_mut(&cb.dependent).unwrap().remove(&id);
-
-            if guard.1.get(&cb.dependent).unwrap().is_empty() {
-                guard.1.remove(&cb.dependent);
-            }
-        }
-        ret.is_some()
-    }
-
     pub(crate) fn obtain_relation_locks<'a, T: Iterator<Item = &'a SmartString<LazyCompact>>>(
         &'s self,
         rels: T,
@@ -661,13 +604,12 @@ impl<'s, S: Storage<'s>> Db<S> {
         tx: &mut SessionTx<'_>,
         cleanups: &mut Vec<(Vec<u8>, Vec<u8>)>,
         cur_vld: ValidityTs,
-        callback_targets: &BTreeSet<SmartString<LazyCompact>>,
         callback_collector: &mut CallbackCollector,
     ) -> Result<NamedRows> {
         #[allow(unused_variables)]
         let sleep_opt = p.out_opts.sleep;
         let (q_res, q_cleanups) =
-            self.run_query(tx, p, cur_vld, callback_targets, callback_collector, true)?;
+            self.run_query(tx, p, cur_vld, callback_collector, true)?;
         cleanups.extend(q_cleanups);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(secs) = sleep_opt {
@@ -694,11 +636,6 @@ impl<'s, S: Storage<'s>> Db<S> {
         } else {
             None
         };
-        let callback_targets = if is_write {
-            self.current_callback_targets()
-        } else {
-            Default::default()
-        };
         let mut cleanups = vec![];
         let res;
         {
@@ -713,7 +650,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                 &mut tx,
                 &mut cleanups,
                 cur_vld,
-                &callback_targets,
                 &mut callback_collector,
             )?;
 
@@ -722,10 +658,6 @@ impl<'s, S: Storage<'s>> Db<S> {
             }
 
             tx.commit_tx()?;
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        if !callback_collector.is_empty() {
-            self.send_callbacks(callback_collector)
         }
 
         Ok(res)
@@ -1222,7 +1154,6 @@ impl<'s, S: Storage<'s>> Db<S> {
         tx: &mut SessionTx<'_>,
         input_program: InputProgram,
         cur_vld: ValidityTs,
-        callback_targets: &BTreeSet<SmartString<LazyCompact>>,
         callback_collector: &mut CallbackCollector,
         top_level: bool,
     ) -> Result<(NamedRows, Vec<(Vec<u8>, Vec<u8>)>)> {
@@ -1361,7 +1292,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                         meta,
                         &entry_head_or_default,
                         cur_vld,
-                        callback_targets,
                         callback_collector,
                         top_level,
                         if *returning == ReturnMutation::Returning {
@@ -1417,7 +1347,6 @@ impl<'s, S: Storage<'s>> Db<S> {
                         meta,
                         &entry_head_or_default,
                         cur_vld,
-                        callback_targets,
                         callback_collector,
                         top_level,
                         if *returning == ReturnMutation::Returning {
