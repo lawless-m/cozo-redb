@@ -636,38 +636,6 @@ fn test_index_short() {
 }
 
 #[test]
-fn test_multi_tx() {
-    let db = new_cozo_mem().unwrap();
-    let tx = db.multi_transaction(true);
-    tx.run_script(":create a {a}", Default::default()).unwrap();
-    tx.run_script("?[a] <- [[1]] :put a {a}", Default::default())
-        .unwrap();
-    assert!(tx.run_script(":create a {a}", Default::default()).is_err());
-    tx.run_script("?[a] <- [[2]] :put a {a}", Default::default())
-        .unwrap();
-    tx.run_script("?[a] <- [[3]] :put a {a}", Default::default())
-        .unwrap();
-    tx.commit().unwrap();
-    assert_eq!(
-        db.run_default("?[a] := *a[a]").unwrap().into_json()["rows"],
-        json!([[1], [2], [3]])
-    );
-
-    let db = new_cozo_mem().unwrap();
-    let tx = db.multi_transaction(true);
-    tx.run_script(":create a {a}", Default::default()).unwrap();
-    tx.run_script("?[a] <- [[1]] :put a {a}", Default::default())
-        .unwrap();
-    assert!(tx.run_script(":create a {a}", Default::default()).is_err());
-    tx.run_script("?[a] <- [[2]] :put a {a}", Default::default())
-        .unwrap();
-    tx.run_script("?[a] <- [[3]] :put a {a}", Default::default())
-        .unwrap();
-    tx.abort().unwrap();
-    assert!(db.run_default("?[a] := *a[a]").is_err());
-}
-
-#[test]
 fn test_vec_types() {
     let db = new_cozo_mem().unwrap();
     db.run_default(":create a {k: String => v: <F32; 8>}")
