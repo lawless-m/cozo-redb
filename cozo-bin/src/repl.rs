@@ -276,11 +276,33 @@ where
                 let json_data: Value = serde_json::from_str(&data).into_diagnostic()?;
                 let json_object = json_data
                     .as_object()
-                    .ok_or_else(|| miette!("A JSON object is required"))?;
-                let mapping = json_object
-                    .iter()
-                    .map(|(k, v)| NamedRows::from_json(v).map(|r| (k.to_string(), r)))
-                    .collect::<Result<_, _>>()?;
+                    .ok_or_else(|| miette!("a JSON object keyed by relation name is required"))?;
+                let mut mapping: BTreeMap<String, NamedRows> = BTreeMap::new();
+                for (rel_name, rel_value) in json_object {
+                    let headers = rel_value
+                        .get("headers")
+                        .and_then(Value::as_array)
+                        .ok_or_else(|| miette!("'{rel_name}' is missing a 'headers' array"))?
+                        .iter()
+                        .map(|h| {
+                            h.as_str().map(str::to_string).ok_or_else(|| {
+                                miette!("'{rel_name}.headers' must be strings")
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let rows = rel_value
+                        .get("rows")
+                        .and_then(Value::as_array)
+                        .ok_or_else(|| miette!("'{rel_name}' is missing a 'rows' array"))?
+                        .iter()
+                        .map(|row| {
+                            row.as_array()
+                                .ok_or_else(|| miette!("'{rel_name}.rows' must be arrays"))
+                                .map(|r| r.iter().map(DataValue::from).collect::<Vec<_>>())
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    mapping.insert(rel_name.clone(), NamedRows::new(headers, rows));
+                }
                 db.import_relations(mapping)?;
                 println!("Imported data from {url}");
             }
