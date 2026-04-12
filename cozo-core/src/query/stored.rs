@@ -33,11 +33,6 @@ use crate::runtime::transact::SessionTx;
 use crate::storage::Storage;
 use crate::{Db, NamedRows, SourceSpan, StoreTx};
 
-#[derive(Debug, Error, Diagnostic)]
-#[error("attempting to write into relation {0} of arity {1} with data of arity {2}")]
-#[diagnostic(code(eval::relation_arity_mismatch))]
-struct RelationArityMismatch(String, usize, usize);
-
 impl<'a> SessionTx<'a> {
     pub(crate) fn execute_relation<'s, S: Storage<'s>>(
         &mut self,

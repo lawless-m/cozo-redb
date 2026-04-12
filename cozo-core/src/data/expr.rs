@@ -19,7 +19,6 @@ use smartstring::{LazyCompact, SmartString};
 use thiserror::Error;
 
 use crate::data::functions::*;
-use crate::data::relation::NullableColType;
 use crate::data::symb::Symbol;
 use crate::data::value::{DataValue, LARGEST_UTF_CHAR};
 use crate::parse::expr::expr2bytecode;
@@ -253,12 +252,6 @@ pub(crate) struct NoImplementationError(#[label] pub(crate) SourceSpan, pub(crat
 #[error("Found value {1:?} where a boolean value is expected")]
 #[diagnostic(code(eval::predicate_not_bool))]
 pub(crate) struct PredicateTypeError(#[label] pub(crate) SourceSpan, pub(crate) DataValue);
-
-#[derive(Debug, Error, Diagnostic)]
-#[error("Cannot build entity ID from {0:?}")]
-#[diagnostic(code(parser::bad_eid))]
-#[diagnostic(help("Entity ID should be an integer satisfying certain constraints"))]
-struct BadEntityId(DataValue, #[label] SourceSpan);
 
 #[derive(Error, Diagnostic, Debug)]
 #[error("Evaluation of expression failed")]
@@ -730,15 +723,6 @@ pub struct Op {
     pub(crate) min_arity: usize,
     pub(crate) vararg: bool,
     pub(crate) inner: fn(&[DataValue]) -> Result<DataValue>,
-}
-
-/// Used as `Arc<dyn CustomOp>`
-pub trait CustomOp {
-    fn name(&self) -> &'static str;
-    fn min_arity(&self) -> usize;
-    fn vararg(&self) -> bool;
-    fn return_type(&self) -> NullableColType;
-    fn call(&self, args: &[DataValue]) -> Result<DataValue>;
 }
 
 impl serde::Serialize for &'_ Op {

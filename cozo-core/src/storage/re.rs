@@ -16,11 +16,11 @@ use redb::{
 
 use crate::data::tuple::{check_key_for_validity, Tuple};
 use crate::data::value::ValidityTs;
-use crate::runtime::relation::{decode_tuple_from_kv, extend_tuple_from_v};
+use crate::runtime::relation::extend_tuple_from_v;
 use crate::storage::{Storage, StoreTx};
 use crate::utils::swap_option_result;
 
-const TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("cozo");
+const TABLE: TableDefinition<'_, &[u8], &[u8]> = TableDefinition::new("cozo");
 
 /// Creates a redb database object.
 pub fn new_cozo_redb(path: impl AsRef<Path>) -> Result<crate::Db<RedbStorage>> {

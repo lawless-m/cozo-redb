@@ -58,11 +58,11 @@ pub use crate::runtime::db::get_variables;
 pub use crate::runtime::db::Poison;
 pub use crate::runtime::db::ScriptMutability;
 
-pub mod data;
+pub(crate) mod data;
 pub(crate) mod fixed_rule;
 #[cfg(feature = "fts")]
 pub(crate) mod fts;
-pub mod parse;
+pub(crate) mod parse;
 pub(crate) mod query;
 pub(crate) mod runtime;
 pub(crate) mod storage;

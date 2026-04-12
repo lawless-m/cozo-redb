@@ -45,16 +45,16 @@ pub(crate) enum ReturnMutation {
 }
 
 #[derive(Clone, PartialEq, Default)]
-pub struct QueryOutOptions {
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+pub(crate) struct QueryOutOptions {
+    pub(crate) limit: Option<usize>,
+    pub(crate) offset: Option<usize>,
     /// Terminate query with an error if it exceeds this many seconds.
-    pub timeout: Option<f64>,
+    pub(crate) timeout: Option<f64>,
     /// Sleep after performing the query for this number of seconds. Ignored in WASM.
-    pub sleep: Option<f64>,
-    pub sorters: Vec<(Symbol, SortDir)>,
-    pub store_relation: Option<(InputRelationHandle, RelationOp, ReturnMutation)>,
-    pub assertion: Option<QueryAssertion>,
+    pub(crate) sleep: Option<f64>,
+    pub(crate) sorters: Vec<(Symbol, SortDir)>,
+    pub(crate) store_relation: Option<(InputRelationHandle, RelationOp, ReturnMutation)>,
+    pub(crate) assertion: Option<QueryAssertion>,
 }
 
 impl Debug for QueryOutOptions {
@@ -184,13 +184,13 @@ impl QueryOutOptions {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum SortDir {
+pub(crate) enum SortDir {
     Asc,
     Dsc,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum RelationOp {
+pub(crate) enum RelationOp {
     Create,
     Replace,
     Put,
@@ -219,7 +219,7 @@ impl TempSymbGen {
 }
 
 #[derive(Debug, Clone)]
-pub enum InputInlineRulesOrFixed {
+pub(crate) enum InputInlineRulesOrFixed {
     Rules { rules: Vec<InputInlineRule> },
     Fixed { fixed: FixedRuleApply },
 }
@@ -249,14 +249,14 @@ impl InputInlineRulesOrFixed {
 }
 
 #[derive(Clone)]
-pub struct FixedRuleApply {
-    pub fixed_handle: FixedRuleHandle,
-    pub rule_args: Vec<FixedRuleArg>,
-    pub options: Arc<BTreeMap<SmartString<LazyCompact>, Expr>>,
-    pub head: Vec<Symbol>,
-    pub arity: usize,
-    pub span: SourceSpan,
-    pub fixed_impl: Arc<Box<dyn FixedRule>>,
+pub(crate) struct FixedRuleApply {
+    pub(crate) fixed_handle: FixedRuleHandle,
+    pub(crate) rule_args: Vec<FixedRuleArg>,
+    pub(crate) options: Arc<BTreeMap<SmartString<LazyCompact>, Expr>>,
+    pub(crate) head: Vec<Symbol>,
+    pub(crate) arity: usize,
+    pub(crate) span: SourceSpan,
+    pub(crate) fixed_impl: Arc<Box<dyn FixedRule>>,
 }
 
 impl FixedRuleApply {
@@ -367,7 +367,7 @@ impl Debug for MagicFixedRuleApply {
 }
 
 #[derive(Clone)]
-pub enum FixedRuleArg {
+pub(crate) enum FixedRuleArg {
     InMem {
         name: Symbol,
         bindings: Vec<Symbol>,
@@ -462,13 +462,13 @@ impl MagicFixedRuleRuleArg {
 
 /// This is a single query, as you'd find between `{}` in a chained query script or with no `{}` in a single query script.
 #[derive(Debug, Clone)]
-pub struct InputProgram {
+pub(crate) struct InputProgram {
     /// A mapping of names to rules.  The entry rule must be named `?`.
     ///
     /// Ex: `?` in `?[a, b] := ...`
-    pub prog: BTreeMap<Symbol, InputInlineRulesOrFixed>,
-    pub out_opts: QueryOutOptions,
-    pub disable_magic_rewrite: bool,
+    pub(crate) prog: BTreeMap<Symbol, InputInlineRulesOrFixed>,
+    pub(crate) out_opts: QueryOutOptions,
+    pub(crate) disable_magic_rewrite: bool,
 }
 
 impl Display for InputProgram {
@@ -883,11 +883,11 @@ impl MagicSymbol {
 }
 
 #[derive(Debug, Clone)]
-pub struct InputInlineRule {
-    pub head: Vec<Symbol>,
-    pub aggr: Vec<Option<(Aggregation, Vec<DataValue>)>>,
-    pub body: Vec<InputAtom>,
-    pub span: SourceSpan,
+pub(crate) struct InputInlineRule {
+    pub(crate) head: Vec<Symbol>,
+    pub(crate) aggr: Vec<Option<(Aggregation, Vec<DataValue>)>>,
+    pub(crate) body: Vec<InputAtom>,
+    pub(crate) span: SourceSpan,
 }
 
 #[derive(Debug)]
@@ -927,7 +927,7 @@ impl MagicInlineRule {
 }
 
 #[derive(Clone)]
-pub enum InputAtom {
+pub(crate) enum InputAtom {
     Rule {
         inner: InputRuleApplyAtom,
     },
@@ -962,12 +962,12 @@ pub enum InputAtom {
 }
 
 #[derive(Clone)]
-pub struct SearchInput {
-    pub relation: Symbol,
-    pub index: Symbol,
-    pub bindings: BTreeMap<SmartString<LazyCompact>, Expr>,
-    pub parameters: BTreeMap<SmartString<LazyCompact>, Expr>,
-    pub span: SourceSpan,
+pub(crate) struct SearchInput {
+    pub(crate) relation: Symbol,
+    pub(crate) index: Symbol,
+    pub(crate) bindings: BTreeMap<SmartString<LazyCompact>, Expr>,
+    pub(crate) parameters: BTreeMap<SmartString<LazyCompact>, Expr>,
+    pub(crate) span: SourceSpan,
 }
 
 #[derive(Clone, Debug)]
@@ -1554,26 +1554,26 @@ pub(crate) enum MagicAtom {
 }
 
 #[derive(Clone, Debug)]
-pub struct InputRuleApplyAtom {
-    pub name: Symbol,
-    pub args: Vec<Expr>,
-    pub span: SourceSpan,
+pub(crate) struct InputRuleApplyAtom {
+    pub(crate) name: Symbol,
+    pub(crate) args: Vec<Expr>,
+    pub(crate) span: SourceSpan,
 }
 
 #[derive(Clone, Debug)]
-pub struct InputNamedFieldRelationApplyAtom {
-    pub name: Symbol,
-    pub args: BTreeMap<SmartString<LazyCompact>, Expr>,
-    pub valid_at: Option<ValidityTs>,
-    pub span: SourceSpan,
+pub(crate) struct InputNamedFieldRelationApplyAtom {
+    pub(crate) name: Symbol,
+    pub(crate) args: BTreeMap<SmartString<LazyCompact>, Expr>,
+    pub(crate) valid_at: Option<ValidityTs>,
+    pub(crate) span: SourceSpan,
 }
 
 #[derive(Clone, Debug)]
-pub struct InputRelationApplyAtom {
-    pub name: Symbol,
-    pub args: Vec<Expr>,
-    pub valid_at: Option<ValidityTs>,
-    pub span: SourceSpan,
+pub(crate) struct InputRelationApplyAtom {
+    pub(crate) name: Symbol,
+    pub(crate) args: Vec<Expr>,
+    pub(crate) valid_at: Option<ValidityTs>,
+    pub(crate) span: SourceSpan,
 }
 
 #[derive(Clone, Debug)]
@@ -1607,13 +1607,13 @@ pub(crate) struct MagicRelationApplyAtom {
 }
 
 #[derive(Clone, Debug)]
-pub struct Unification {
+pub(crate) struct Unification {
     /// Symbol to bind expression to.
-    pub binding: Symbol,
-    pub expr: Expr,
+    pub(crate) binding: Symbol,
+    pub(crate) expr: Expr,
     /// If false, `=`, if true, `in`. If true, one row is created for each value in the list in `expr`.
-    pub one_many_unif: bool,
-    pub span: SourceSpan,
+    pub(crate) one_many_unif: bool,
+    pub(crate) span: SourceSpan,
 }
 
 impl Unification {

@@ -269,13 +269,6 @@ impl RelationHandle {
         }
         Ok(ret)
     }
-    pub(crate) fn encode_partial_key_for_store(&self, tuple: &[DataValue]) -> Vec<u8> {
-        let mut ret = self.encode_key_prefix(tuple.len());
-        for val in tuple {
-            ret.encode_datavalue(val);
-        }
-        ret
-    }
     pub(crate) fn encode_val_for_store(
         &self,
         tuple: &[DataValue],
@@ -398,34 +391,6 @@ impl RelationHandle {
                 .store_tx
                 .get(&key_data, false)?
                 .map(|val_data| decode_tuple_from_kv(&key_data, &val_data, Some(self.arity()))))
-        }
-    }
-
-    pub(crate) fn get_val_only(
-        &self,
-        tx: &SessionTx<'_>,
-        key: &[DataValue],
-    ) -> Result<Option<Tuple>> {
-        let key_data = key.encode_as_key(self.id);
-        if self.is_temp {
-            Ok(tx
-                .temp_store_tx
-                .get(&key_data, false)?
-                .map(|val_data| rmp_serde::from_slice(&val_data[ENCODED_KEY_MIN_LEN..]).unwrap()))
-        } else {
-            Ok(tx
-                .store_tx
-                .get(&key_data, false)?
-                .map(|val_data| rmp_serde::from_slice(&val_data[ENCODED_KEY_MIN_LEN..]).unwrap()))
-        }
-    }
-
-    pub(crate) fn exists(&self, tx: &SessionTx<'_>, key: &[DataValue]) -> Result<bool> {
-        let key_data = key.encode_as_key(self.id);
-        if self.is_temp {
-            tx.temp_store_tx.exists(&key_data, false)
-        } else {
-            tx.store_tx.exists(&key_data, false)
         }
     }
 

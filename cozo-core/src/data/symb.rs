@@ -73,7 +73,7 @@ impl Debug for Symbol {
 }
 
 impl Symbol {
-    pub fn new(name: impl Into<SmartString<LazyCompact>>, span: SourceSpan) -> Self {
+    pub(crate) fn new(name: impl Into<SmartString<LazyCompact>>, span: SourceSpan) -> Self {
         Self {
             name: name.into(),
             span,

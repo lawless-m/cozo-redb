@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 use miette::{bail, ensure, miette, Diagnostic, Result};
-use ordered_float::OrderedFloat;
 use smartstring::{LazyCompact, SmartString};
 use thiserror::Error;
 
@@ -23,10 +22,10 @@ use crate::parse::expr::{build_expr, parse_string};
 use crate::parse::query::parse_query;
 use crate::parse::{ExtractSpan, Pairs, Rule, SourceSpan};
 use crate::runtime::relation::AccessLevel;
-use crate::{Expr, FixedRule};
+use crate::FixedRule;
 
 #[derive(Debug)]
-pub enum SysOp {
+pub(crate) enum SysOp {
     Compact,
     ListColumns(Symbol),
     ListIndices(Symbol),
@@ -83,11 +82,6 @@ pub enum HnswDistance {
     InnerProduct,
     Cosine,
 }
-
-#[derive(Debug, Diagnostic, Error)]
-#[error("Cannot interpret {0} as process ID")]
-#[diagnostic(code(parser::not_proc_id))]
-struct ProcessIdError(String, #[label] SourceSpan);
 
 pub(crate) fn parse_sys(
     mut src: Pairs<'_>,

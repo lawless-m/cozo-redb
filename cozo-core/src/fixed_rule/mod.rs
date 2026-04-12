@@ -865,14 +865,6 @@ struct BadEdgeWeightError(DataValue, #[label] SourceSpan);
 struct RuleNotFoundError(String, #[label] SourceSpan);
 
 #[derive(Error, Diagnostic, Debug)]
-#[error("Invalid reverse scanning of triples")]
-#[diagnostic(code(algo::invalid_reverse_triple_scan))]
-#[diagnostic(help(
-    "Inverse scanning of triples requires the type to be 'ref', or the value be indexed"
-))]
-struct InvalidInverseTripleUse(String, #[label] SourceSpan);
-
-#[derive(Error, Diagnostic, Debug)]
 #[error("Required node with key {missing:?} not found")]
 #[diagnostic(code(algo::node_with_key_not_found))]
 #[diagnostic(help(

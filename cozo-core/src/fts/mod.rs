@@ -46,7 +46,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use miette::{bail, IntoDiagnostic, Result};
+use miette::{IntoDiagnostic, Result};
 use serde_derive::{Deserialize, Serialize};
 use smartstring::{LazyCompact, SmartString};
 use tantivy::collector::TopDocs;
@@ -101,7 +101,6 @@ impl FtsIndexManifest {
 /// in the writer and flushed on cozo transaction commit via
 /// [`FtsIndexCache::commit_pending`].
 pub(crate) struct FtsIndexRuntime {
-    pub(crate) schema: Schema,
     pub(crate) index: Index,
     pub(crate) writer: Mutex<IndexWriter>,
     pub(crate) reader: IndexReader,
@@ -150,7 +149,6 @@ impl FtsIndexRuntime {
         let key_field = schema.get_field(KEY_FIELD).unwrap();
 
         Ok(Self {
-            schema,
             index,
             writer: Mutex::new(writer),
             reader,

@@ -72,11 +72,6 @@ impl Drop for RunningQueryCleanup {
     }
 }
 
-#[derive(serde_derive::Serialize, serde_derive::Deserialize)]
-pub struct DbManifest {
-    pub storage_version: u64,
-}
-
 /// Whether a script is mutable or immutable.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ScriptMutability {
@@ -99,6 +94,7 @@ pub struct Db<S> {
     /// Filesystem path to the underlying persistent store (the `.redb` file
     /// for the redb backend, or an empty path for in-memory). Used by the
     /// FTS subsystem to derive the sidecar tantivy directory.
+    #[cfg(feature = "fts")]
     pub(crate) db_path: Arc<std::path::PathBuf>,
     /// Per-Db cache of live tantivy indices. Shared across all transactions
     /// derived from this Db. Only present when the `fts` feature is enabled.
@@ -111,11 +107,6 @@ impl<S> Debug for Db<S> {
         write!(f, "Db")
     }
 }
-
-#[derive(Debug, Diagnostic, Error)]
-#[error("Initialization of database failed")]
-#[diagnostic(code(db::init))]
-pub(crate) struct BadDbInit(#[help] pub(crate) String);
 
 #[derive(Debug, Error, Diagnostic)]
 #[error("Cannot import data into relation {0} as it is an index")]
@@ -216,6 +207,8 @@ impl<'s, S: Storage<'s>> Db<S> {
     /// an empty path (for in-memory). It is used by the FTS subsystem to
     /// derive sidecar tantivy directory locations.
     pub fn new(storage: S, db_path: impl Into<std::path::PathBuf>) -> Result<Self> {
+        #[cfg(not(feature = "fts"))]
+        let _ = db_path;
         let ret = Self {
             db: storage,
             temp_db: Default::default(),
@@ -224,6 +217,7 @@ impl<'s, S: Storage<'s>> Db<S> {
             running_queries: Default::default(),
             fixed_rules: Arc::new(ShardedLock::new(DEFAULT_FIXED_RULES.clone())),
             relation_locks: Default::default(),
+            #[cfg(feature = "fts")]
             db_path: Arc::new(db_path.into()),
             #[cfg(feature = "fts")]
             fts_cache: Arc::new(crate::fts::FtsIndexCache::default()),
@@ -270,7 +264,7 @@ impl<'s, S: Storage<'s>> Db<S> {
     }
 
     /// Run the AST CozoScript passed in.
-    pub fn run_script_ast(
+    pub(crate) fn run_script_ast(
         &'s self,
         payload: CozoScript,
         cur_vld: ValidityTs,
@@ -343,11 +337,6 @@ impl<'s, S: Storage<'s>> Db<S> {
     /// Note that triggers and callbacks are _not_ run for the relations, if any exists.
     /// If you need to activate triggers or callbacks, use queries with parameters.
     pub fn import_relations(&'s self, data: BTreeMap<String, NamedRows>) -> Result<()> {
-        #[derive(Debug, Diagnostic, Error)]
-        #[error("cannot import data for relation '{0}': {1}")]
-        #[diagnostic(code(import::bad_data))]
-        struct BadDataForRelation(String, JsonValue);
-
         let rel_names = data.keys().map(SmartString::from).collect_vec();
         let locks = self.obtain_relation_locks(rel_names.iter());
         let _guards = locks.iter().map(|l| l.read().unwrap()).collect_vec();
@@ -522,7 +511,7 @@ impl<'s, S: Storage<'s>> Db<S> {
         tx.commit_tx()?;
         Ok(())
     }
-    pub(crate) fn transact(&'s self) -> Result<SessionTx<'_>> {
+    pub(crate) fn transact(&'s self) -> Result<SessionTx<'s>> {
         let ret = SessionTx {
             store_tx: Box::new(self.db.transact(false)?),
             temp_store_tx: self.temp_db.transact(true)?,
@@ -535,7 +524,7 @@ impl<'s, S: Storage<'s>> Db<S> {
         };
         Ok(ret)
     }
-    pub(crate) fn transact_write(&'s self) -> Result<SessionTx<'_>> {
+    pub(crate) fn transact_write(&'s self) -> Result<SessionTx<'s>> {
         let ret = SessionTx {
             store_tx: Box::new(self.db.transact(true)?),
             temp_store_tx: self.temp_db.transact(true)?,

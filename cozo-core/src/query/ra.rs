@@ -7,14 +7,13 @@
  */
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{Debug, Formatter, Write};
+use std::fmt::{Debug, Formatter};
 use std::iter;
 
 use either::{Left, Right};
 use itertools::Itertools;
 use log::{debug, error};
 use miette::{bail, Diagnostic, Result};
-use smartstring::SmartString;
 use thiserror::Error;
 
 use crate::data::expr::{compute_bounds, eval_bytecode, eval_bytecode_pred, Bytecode, Expr};
@@ -72,11 +71,6 @@ pub(crate) struct UnificationRA {
     pub(crate) to_eliminate: BTreeSet<Symbol>,
     pub(crate) span: SourceSpan,
 }
-
-#[derive(Debug, Error, Diagnostic)]
-#[error("Found value {0:?} while iterating, unacceptable for an Entity ID")]
-#[diagnostic(code(eval::iter_bad_entity_id))]
-struct EntityIdExpected(DataValue, #[label] SourceSpan);
 
 fn eliminate_from_tuple(mut ret: Tuple, eliminate_indices: &BTreeSet<usize>) -> Tuple {
     if !eliminate_indices.is_empty() {

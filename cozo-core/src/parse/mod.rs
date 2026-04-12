@@ -46,32 +46,26 @@ pub(crate) type Pairs<'a> = pest::iterators::Pairs<'a, Rule>;
 
 /// This represents a full Cozo script, as you'd pass to `run_script`.
 #[derive(Debug)]
-pub enum CozoScript {
-    #[allow(missing_docs)]
+pub(crate) enum CozoScript {
     Single(InputProgram),
-    #[allow(missing_docs)]
     Imperative(ImperativeProgram),
-    #[allow(missing_docs)]
     Sys(SysOp),
 }
 
-#[allow(missing_docs)]
 #[derive(Debug)]
-pub struct ImperativeStmtClause {
-    pub prog: InputProgram,
-    pub store_as: Option<SmartString<LazyCompact>>,
+pub(crate) struct ImperativeStmtClause {
+    pub(crate) prog: InputProgram,
+    pub(crate) store_as: Option<SmartString<LazyCompact>>,
 }
 
-#[allow(missing_docs)]
 #[derive(Debug)]
-pub struct ImperativeSysop {
-    pub sysop: SysOp,
-    pub store_as: Option<SmartString<LazyCompact>>,
+pub(crate) struct ImperativeSysop {
+    pub(crate) sysop: SysOp,
+    pub(crate) store_as: Option<SmartString<LazyCompact>>,
 }
 
-#[allow(missing_docs)]
 #[derive(Debug)]
-pub enum ImperativeStmt {
+pub(crate) enum ImperativeStmt {
     Break {
         target: Option<SmartString<LazyCompact>>,
         span: SourceSpan,
@@ -116,7 +110,7 @@ pub(crate) type ImperativeCondition = Either<SmartString<LazyCompact>, Imperativ
 
 /// This is a [chained query](https://docs.cozodb.org/en/latest/stored.html#chaining-queries),
 /// a series of `{}` queries possibly with imperative directives like `%if` and `%loop`.
-pub type ImperativeProgram = Vec<ImperativeStmt>;
+pub(crate) type ImperativeProgram = Vec<ImperativeStmt>;
 
 impl ImperativeStmt {
     pub(crate) fn needs_write_locks(&self, collector: &mut BTreeSet<SmartString<LazyCompact>>) {
@@ -296,7 +290,7 @@ pub(crate) fn parse_expressions(
 /// * `fixed_rules` - a mapping of fixed rule names to their implementations. These are substituted into the syntax tree during parsing.
 ///
 /// * `cur_vld` - the current timestamp, substituted into expressions where validity is relevant.
-pub fn parse_script(
+pub(crate) fn parse_script(
     src: &str,
     param_pool: &BTreeMap<String, DataValue>,
     fixed_rules: &BTreeMap<String, Arc<Box<dyn FixedRule>>>,

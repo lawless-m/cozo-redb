@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "cozo-core",
     "cozo-bin",
-    "cozo-core-examples",
 ]
 exclude = [
     # cozo-lib-wasm is parked pending a rewrite against the typed

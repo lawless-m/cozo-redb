@@ -304,11 +304,6 @@ fn build_term(pair: Pair<'_>, param_pool: &BTreeMap<String, DataValue>) -> Resul
                 .into_inner()
                 .map(|v| build_expr(v, param_pool))
                 .try_collect()?;
-            #[derive(Error, Diagnostic, Debug)]
-            #[error("Named function '{0}' not found")]
-            #[diagnostic(code(parser::func_not_function))]
-            struct FuncNotFoundError(String, #[label] SourceSpan);
-
             match ident {
                 "cond" => {
                     if args.is_empty() {

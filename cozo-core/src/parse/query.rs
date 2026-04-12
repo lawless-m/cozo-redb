@@ -67,11 +67,6 @@ struct MultipleRuleDefinitionError(String, Vec<SourceSpan>);
 #[diagnostic(code(parser::multiple_out_assert))]
 struct DuplicateQueryAssertion(#[label] SourceSpan);
 
-#[derive(Debug, Error, Diagnostic)]
-#[error("Multiple query yields defined")]
-#[diagnostic(code(parser::multiple_yields))]
-struct DuplicateYield(#[label] SourceSpan);
-
 impl Error for MultipleRuleDefinitionError {}
 
 impl Display for MultipleRuleDefinitionError {
