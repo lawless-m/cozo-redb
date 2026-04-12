@@ -10,113 +10,91 @@
 
 extern crate test;
 
-use cozo::{DataValue, DbInstance, NamedRows, Validity};
+use cozo::{DataValue, DbInstance, NamedRows, ScriptMutability, Validity};
 use itertools::Itertools;
 use lazy_static::{initialize, lazy_static};
 use rand::Rng;
 use rayon::prelude::*;
 use std::cmp::max;
 use std::collections::BTreeMap;
+use std::env;
+use std::path::PathBuf;
 use std::time::Instant;
 use test::Bencher;
 
+fn bench_base() -> usize {
+    env::var("COZO_BENCH_TT_BASE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10000)
+}
+
+fn bench_max_k() -> usize {
+    env::var("COZO_BENCH_TT_MAX_K")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1000)
+}
+
+fn bench_k_values() -> Vec<usize> {
+    let max_k = bench_max_k();
+    [1usize, 10, 100, 1000].into_iter().filter(|k| *k <= max_k).collect()
+}
+
 fn insert_data(db: &DbInstance) {
+    let base = bench_base();
+
     let insert_plain_time = Instant::now();
     let mut to_import = BTreeMap::new();
     to_import.insert(
         "plain".to_string(),
         NamedRows {
             headers: vec!["k".to_string(), "v".to_string()],
-            rows: (0..10000).map(|i| vec![DataValue::from(i as i64), DataValue::from(i as i64)]).collect_vec(),
+            rows: (0..base).map(|i| vec![DataValue::from(i as i64), DataValue::from(i as i64)]).collect_vec(),
             next: None,
         },
     );
     db.import_relations(to_import).unwrap();
-    dbg!(insert_plain_time.elapsed());
+    println!("inserted plain ({} rows) in {:?}", base, insert_plain_time.elapsed());
 
-    let insert_tt1_time = Instant::now();
-    let mut to_import = BTreeMap::new();
-    to_import.insert(
-        "tt1".to_string(),
-        NamedRows {
-            headers: vec!["k".to_string(), "vld".to_string(), "v".to_string()],
-            rows: (0..10000)
-                .map(|i| vec![
-                    DataValue::from(i as i64),
-                    DataValue::Validity(Validity::from((0, true))),
-                    DataValue::from(i as i64),
-                ])
-                .collect_vec(),
-            next: None,
-        },
-    );
-    db.import_relations(to_import).unwrap();
-    dbg!(insert_tt1_time.elapsed());
-
-    let insert_tt10_time = Instant::now();
-    let mut to_import = BTreeMap::new();
-    to_import.insert(
-        "tt10".to_string(),
-        NamedRows {
-            headers: vec!["k".to_string(), "vld".to_string(), "v".to_string()],
-            rows: (0..10000)
-                .flat_map(|i| (0..10).map(move |vld| vec![
-                    DataValue::from(i as i64),
-                    DataValue::Validity(Validity::from((vld, true))),
-                    DataValue::from(i as i64),
-                ]))
-                .collect_vec(),
-            next: None,
-        },
-    );
-    db.import_relations(to_import).unwrap();
-    dbg!(insert_tt10_time.elapsed());
-
-    let insert_tt100_time = Instant::now();
-    let mut to_import = BTreeMap::new();
-    to_import.insert(
-        "tt100".to_string(),
-        NamedRows {
-            headers: vec!["k".to_string(), "vld".to_string(), "v".to_string()],
-            rows: (0..10000)
-                .flat_map(|i| (0..100).map(move |vld| vec![
-                    DataValue::from(i as i64),
-                    DataValue::Validity(Validity::from((vld, true))),
-                    DataValue::from(i as i64),
-                ]))
-                .collect_vec(),
-            next: None,
-        },
-    );
-    db.import_relations(to_import).unwrap();
-    dbg!(insert_tt100_time.elapsed());
-
-    let insert_tt1000_time = Instant::now();
-    let mut to_import = BTreeMap::new();
-    to_import.insert(
-        "tt1000".to_string(),
-        NamedRows {
-            headers: vec!["k".to_string(), "vld".to_string(), "v".to_string()],
-            rows: (0..10000)
-                .flat_map(|i| {
-                    (0..1000).map(move |vld| vec![
+    for k in bench_k_values() {
+        let rel = format!("tt{}", k);
+        let insert_time = Instant::now();
+        let mut to_import = BTreeMap::new();
+        to_import.insert(
+            rel.clone(),
+            NamedRows {
+                headers: vec!["k".to_string(), "vld".to_string(), "v".to_string()],
+                rows: (0..base)
+                    .flat_map(|i| (0..k).map(move |vld| vec![
                         DataValue::from(i as i64),
-                        DataValue::Validity((vld, true).into()),
+                        DataValue::Validity(Validity::from((vld as i64, true))),
                         DataValue::from(i as i64),
-                    ])
-                })
-                .collect_vec(),
-            next: None,
-        },
-    );
-    db.import_relations(to_import).unwrap();
-    dbg!(insert_tt1000_time.elapsed());
+                    ]))
+                    .collect_vec(),
+                next: None,
+            },
+        );
+        db.import_relations(to_import).unwrap();
+        println!("inserted {} ({} rows) in {:?}", rel, base * k, insert_time.elapsed());
+    }
 }
 
 lazy_static! {
     static ref TEST_DB: DbInstance = {
-        let db_path = "_time_travel_rocks.db";
-        let db = DbInstance::new("rocksdb", db_path, "").unwrap();
+        let engine = env::var("COZO_TEST_DB_ENGINE").unwrap_or_else(|_| "rocksdb".to_string());
+        let dir = env::var("COZO_BENCH_TT_DIR").unwrap_or_else(|_| ".".to_string());
+        let mut db_path = PathBuf::from(dir);
+        db_path.push(format!("time_travel_{}.db", engine));
+
+        if engine != "mem" {
+            let _ = std::fs::remove_file(&db_path);
+            let _ = std::fs::remove_dir_all(&db_path);
+        }
+
+        let path_str = if engine == "mem" { "".to_string() } else { db_path.to_string_lossy().into_owned() };
+        println!("time_travel bench: engine={} path={:?}", engine, path_str);
+        let db = DbInstance::new(&engine, &path_str, "").unwrap();
 
         let create_res = db.run_script(
             r#"
@@ -127,6 +105,7 @@ lazy_static! {
         {:create tt1000 {k: Int, vld: Validity => v}}
         "#,
             Default::default(),
+            ScriptMutability::Mutable,
         );
 
         if create_res.is_ok() {
@@ -145,6 +124,7 @@ fn single_plain_read() {
         .run_script(
             "?[v] := *plain{k: $id, v}",
             BTreeMap::from([("id".to_string(), DataValue::from(i as i64))]),
+            ScriptMutability::Mutable,
         )
         .unwrap();
 }
@@ -156,6 +136,7 @@ fn plain_aggr() {
     ?[sum(v)] := *plain{v}
     "#,
             BTreeMap::default(),
+            ScriptMutability::Mutable,
         )
         .unwrap();
 }
@@ -171,6 +152,7 @@ fn tt_stupid_aggr(k: usize) {
                 k
             ),
             BTreeMap::default(),
+            ScriptMutability::Mutable,
         )
         .unwrap();
 }
@@ -185,6 +167,7 @@ fn tt_travel_aggr(k: usize) {
                 k
             ),
             BTreeMap::default(),
+            ScriptMutability::Mutable,
         )
         .unwrap();
 }
@@ -200,6 +183,7 @@ fn single_tt_read(k: usize) {
                 k
             ),
             BTreeMap::from([("id".to_string(), DataValue::from(i as i64))]),
+            ScriptMutability::Mutable,
         )
         .unwrap();
 }
@@ -215,6 +199,7 @@ fn single_tt_travel_read(k: usize) {
                 k
             ),
             BTreeMap::from([("id".to_string(), DataValue::from(i as i64))]),
+            ScriptMutability::Mutable,
         )
         .unwrap();
 }
@@ -230,7 +215,7 @@ fn time_travel_init(_: &mut Bencher) {
     });
     dbg!((count as f64) / qps_single_plain_time.elapsed().as_secs_f64());
 
-    for k in [1, 10, 100, 1000] {
+    for k in bench_k_values() {
         let count = 100_000;
         let qps_single_tt_time = Instant::now();
         (0..count).into_par_iter().for_each(|_| {
@@ -240,7 +225,7 @@ fn time_travel_init(_: &mut Bencher) {
         dbg!((count as f64) / qps_single_tt_time.elapsed().as_secs_f64());
     }
 
-    for k in [1, 10, 100, 1000] {
+    for k in bench_k_values() {
         let count = 100_000;
         let qps_single_tt_travel_time = Instant::now();
         (0..count).into_par_iter().for_each(|_| {
@@ -258,7 +243,7 @@ fn time_travel_init(_: &mut Bencher) {
     });
     dbg!(plain_aggr_time.elapsed().as_secs_f64() * 1000. / (count as f64));
 
-    for k in [1, 10, 100, 1000] {
+    for k in bench_k_values() {
         let count = max(1000 / k, 5);
         let tt_stupid_aggr_time = Instant::now();
         (0..count).for_each(|_| {

@@ -21,7 +21,7 @@ cargo build --release -p cozo_java -F storage-rocksdb
 
 为安卓编译较为复杂，以下仅做简要叙述。
 
-首先，在编译时请不要使用 `-F storage-rocksdb` 选项，除非你有能力在 `build.rs` 中做出大量调整使得 [cozorocks](../cozorocks) 能够成功为安卓编译。
+首先，在编译时请不要使用 `-F storage-rocksdb` 选项，除非你有能力调整 `librocksdb-sys` 的 C++ 编译选项使得 RocksDB 能够成功为安卓交叉编译。
 
 然后，在 Rust 工具链中添加安卓目标，设置好安卓 NDK 以及其编译路径、库路径等。手动搞定这些非常复杂，不过 [这里](https://github.com/cross-rs/cross) 有一些系统镜像可以省去你不少工作。
 

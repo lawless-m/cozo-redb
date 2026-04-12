@@ -23,8 +23,6 @@ pub(crate) mod sqlite;
 pub(crate) mod temp;
 #[cfg(feature = "storage-tikv")]
 pub(crate) mod tikv;
-#[cfg(feature = "storage-new-rocksdb")]
-pub mod newrocks;
 #[cfg(feature = "storage-redb")]
 pub(crate) mod re;
 
