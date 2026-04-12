@@ -24,7 +24,6 @@ jobs:
           - sqlite
           - rocksdb
           - redb
-          - sled
           - all
         include:
           - backend: sqlite
@@ -33,10 +32,8 @@ jobs:
             features: graph-algo,storage-rocksdb
           - backend: redb
             features: graph-algo,storage-redb
-          - backend: sled
-            features: graph-algo,storage-sled
           - backend: all
-            features: graph-algo,storage-sqlite,storage-rocksdb,storage-redb,storage-sled
+            features: graph-algo,storage-sqlite,storage-rocksdb,storage-redb
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -88,7 +85,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: docs
-      - run: cargo doc --no-deps -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb,storage-redb,storage-sled
+      - run: cargo doc --no-deps -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb,storage-redb
 
   fmt:
     name: fmt
@@ -112,4 +109,4 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: clippy
-      - run: cargo clippy -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb,storage-redb,storage-sled
+      - run: cargo clippy -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb,storage-redb

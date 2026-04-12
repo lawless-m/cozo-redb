@@ -62,8 +62,6 @@ pub use storage::mem::{new_cozo_mem, MemStorage};
 pub use storage::re::{new_cozo_redb, RedbStorage};
 #[cfg(feature = "storage-rocksdb")]
 pub use storage::rocks::{new_cozo_rocksdb, RocksDbStorage};
-#[cfg(feature = "storage-sled")]
-pub use storage::sled::{new_cozo_sled, SledStorage};
 #[cfg(feature = "storage-sqlite")]
 pub use storage::sqlite::{new_cozo_sqlite, SqliteStorage};
 #[cfg(feature = "storage-tikv")]
@@ -112,9 +110,6 @@ pub enum DbInstance {
     #[cfg(feature = "storage-rocksdb")]
     /// RocksDB storage
     RocksDb(Db<RocksDbStorage>),
-    #[cfg(feature = "storage-sled")]
-    /// Sled storage (experimental)
-    Sled(Db<SledStorage>),
     #[cfg(feature = "storage-redb")]
     /// Redb storage
     Redb(Db<RedbStorage>),
@@ -136,7 +131,6 @@ impl DbInstance {
     /// * `mem`
     /// * `sqlite`
     /// * `rocksdb`
-    /// * `sled`
     /// * `tikv`
     ///
     /// assuming all features are enabled during compilation. Otherwise only
@@ -153,8 +147,6 @@ impl DbInstance {
             "sqlite" => Self::Sqlite(new_cozo_sqlite(path)?),
             #[cfg(feature = "storage-rocksdb")]
             "rocksdb" => Self::RocksDb(new_cozo_rocksdb(path)?),
-            #[cfg(feature = "storage-sled")]
-            "sled" => Self::Sled(new_cozo_sled(path)?),
             #[cfg(feature = "storage-redb")]
             "redb" => Self::Redb(new_cozo_redb(path)?),
             #[cfg(feature = "storage-tikv")]
@@ -190,8 +182,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.get_fixed_rules(),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.get_fixed_rules(),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.get_fixed_rules(),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.get_fixed_rules(),
             #[cfg(feature = "storage-redb")]
@@ -229,8 +219,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.run_script_ast(payload, cur_vld, mutability),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.run_script_ast(payload, cur_vld, mutability),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.run_script_ast(payload, cur_vld, mutability),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.run_script_ast(payload, cur_vld, mutability),
             #[cfg(feature = "storage-redb")]
@@ -304,8 +292,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.export_relations(relations),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.export_relations(relations),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.export_relations(relations),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.export_relations(relations),
             #[cfg(feature = "storage-redb")]
@@ -346,8 +332,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.import_relations(data),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.import_relations(data),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.import_relations(data),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.import_relations(data),
             #[cfg(feature = "storage-redb")]
@@ -389,8 +373,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.backup_db(out_file),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.backup_db(out_file),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.backup_db(out_file),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.backup_db(out_file),
             #[cfg(feature = "storage-redb")]
@@ -413,8 +395,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.restore_backup(in_file),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.restore_backup(in_file),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.restore_backup(in_file),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.restore_backup(in_file),
             #[cfg(feature = "storage-redb")]
@@ -441,8 +421,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.import_from_backup(in_file, relations),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.import_from_backup(in_file, relations),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.import_from_backup(in_file, relations),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.import_from_backup(in_file, relations),
             #[cfg(feature = "storage-redb")]
@@ -481,8 +459,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.register_callback(relation, capacity),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.register_callback(relation, capacity),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.register_callback(relation, capacity),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.register_callback(relation, capacity),
             #[cfg(feature = "storage-redb")]
@@ -499,8 +475,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.unregister_callback(id),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.unregister_callback(id),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.unregister_callback(id),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.unregister_callback(id),
             #[cfg(feature = "storage-redb")]
@@ -518,8 +492,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.register_fixed_rule(name, rule_impl),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.register_fixed_rule(name, rule_impl),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.register_fixed_rule(name, rule_impl),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.register_fixed_rule(name, rule_impl),
             #[cfg(feature = "storage-redb")]
@@ -534,8 +506,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.unregister_fixed_rule(name),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.unregister_fixed_rule(name),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.unregister_fixed_rule(name),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.unregister_fixed_rule(name),
             #[cfg(feature = "storage-redb")]
@@ -556,8 +526,6 @@ impl DbInstance {
             DbInstance::Sqlite(db) => db.run_multi_transaction(write, payloads, results),
             #[cfg(feature = "storage-rocksdb")]
             DbInstance::RocksDb(db) => db.run_multi_transaction(write, payloads, results),
-            #[cfg(feature = "storage-sled")]
-            DbInstance::Sled(db) => db.run_multi_transaction(write, payloads, results),
             #[cfg(feature = "storage-tikv")]
             DbInstance::TiKv(db) => db.run_multi_transaction(write, payloads, results),
             #[cfg(feature = "storage-redb")]

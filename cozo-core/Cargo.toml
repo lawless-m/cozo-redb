@@ -46,11 +46,6 @@ wasm = ["uuid/js", "dep:js-sys"]
 
 #! The following features are highly experimental:
 
-## Enables the [Sled](https://github.com/spacejam/sled) backend.
-## Sled is slower than Sqlite for the usual workload of Cozo, can use quite a lot of disk space,
-## and may not be stable enough. In general you should use RocksDB instead.
-## The Sled engine does not support time travel.
-storage-sled = ["dep:sled"]
 ## Enables the [redb](https://github.com/cberner/redb) backend.
 ## Pure Rust, single-file, ACID transactions, supports time travel.
 storage-redb = ["dep:redb"]
@@ -123,7 +118,6 @@ rayon = { version = "1.10.0", optional = true }
 minreq = { version = "2.11.2", features = ["https-rustls"], optional = true }
 tikv-jemallocator-global = { version = "0.5.0", optional = true }
 rocksdb = { version = "0.22.0", optional = true }
-sled = { version = "0.34.7", optional = true }
 redb = { version = "4.0.0", optional = true }
 tikv-client = { version = "0.3.0", optional = true }
 tokio = { version = "1.37.0", optional = true }

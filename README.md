@@ -14,7 +14,7 @@
 >
 > * added a `redb` storage backend (with time travel),
 > * retired the `cozorocks` C++ FFI subcrate in favour of the pure-Rust `rocksdb` crate,
-> * fixed sled's `del()` bug and wired in time travel for sled,
+> * dropped the `sled` backend (read perf regressed 6× between smoke and medium scale in benchmarks; unreliable for production),
 > * carries benchmark infrastructure and comprehensive CI,
 > * Rust-only — the Python, Node, Java, Clojure, Go, Swift, Android and C bindings from
 >   upstream are not maintained here; if you need those, upstream v0.7 still works.
@@ -211,8 +211,7 @@ This fork targets Rust embedders first.
 
 * **Rust library**: add `cozo` to your `Cargo.toml` via the workspace crate in `cozo-core/`.
   Enable the backends you want via features: `storage-sqlite`, `storage-rocksdb`,
-  `storage-redb`, `storage-sled`. The `graph-algo` feature pulls in the built-in
-  graph algorithms.
+  `storage-redb`. The `graph-algo` feature pulls in the built-in graph algorithms.
 * **Standalone binary** (`cozo-bin/`): HTTP server + CLI for ad-hoc queries against a
   database file. Build with `cargo build --release -p cozo-bin --features compact,storage-rocksdb`.
 * **WebAssembly** (`cozo-lib-wasm/`): in-browser build. Currently being rebuilt; don't
@@ -230,8 +229,7 @@ can be adapted to this fork's query engine if anyone wants to maintain them.
 | (always)            | In-memory     | Non-persistent. Fastest. Used by tests and the WASM build.                                                |
 | `storage-sqlite`    | SQLite        | Historical default. Also used as the backup/interchange format.                                           |
 | `storage-rocksdb`   | RocksDB       | Pure-Rust via the `rocksdb` crate. Highest write throughput and concurrency.                              |
-| `storage-redb`      | redb          | Pure-Rust, mmap B-tree. Wins all read and aggregation workloads vs sqlite (see `cozo-core/BENCHMARKS.md`). |
-| `storage-sled`      | sled          | Experimental; feature-complete including time travel but known to regress under large single transactions. Not recommended for production. |
+| `storage-redb`      | redb          | Pure-Rust, mmap B-tree. Wins all read and aggregation workloads vs sqlite (see `cozo-core/BENCHMARKS.md`). Recommended default. |
 
 ### Tuning the RocksDB backend
 
@@ -263,7 +261,7 @@ with each layer only calling into the layer below:
 
 The storage engine defines a `Storage` trait — a key-value interface over binary blobs
 with range scan — and several implementations that plug into it: in-memory, SQLite,
-RocksDB, redb, and sled. A TiKV client backend exists in the tree but is not exercised
+RocksDB, and redb. A TiKV client backend exists in the tree but is not exercised
 in this fork. Rust embedders can also provide custom backends by implementing the trait.
 
 The SQLite backend also doubles as the backup/interchange file format, so you can
