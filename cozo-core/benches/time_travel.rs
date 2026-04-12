@@ -38,7 +38,10 @@ fn bench_max_k() -> usize {
 
 fn bench_k_values() -> Vec<usize> {
     let max_k = bench_max_k();
-    [1usize, 10, 100, 1000].into_iter().filter(|k| *k <= max_k).collect()
+    [1usize, 10, 100, 1000]
+        .into_iter()
+        .filter(|k| *k <= max_k)
+        .collect()
 }
 
 fn insert_data(db: &DbInstance) {
@@ -50,12 +53,18 @@ fn insert_data(db: &DbInstance) {
         "plain".to_string(),
         NamedRows {
             headers: vec!["k".to_string(), "v".to_string()],
-            rows: (0..base).map(|i| vec![DataValue::from(i as i64), DataValue::from(i as i64)]).collect_vec(),
+            rows: (0..base)
+                .map(|i| vec![DataValue::from(i as i64), DataValue::from(i as i64)])
+                .collect_vec(),
             next: None,
         },
     );
     db.import_relations(to_import).unwrap();
-    println!("inserted plain ({} rows) in {:?}", base, insert_plain_time.elapsed());
+    println!(
+        "inserted plain ({} rows) in {:?}",
+        base,
+        insert_plain_time.elapsed()
+    );
 
     for k in bench_k_values() {
         let rel = format!("tt{}", k);
@@ -66,17 +75,26 @@ fn insert_data(db: &DbInstance) {
             NamedRows {
                 headers: vec!["k".to_string(), "vld".to_string(), "v".to_string()],
                 rows: (0..base)
-                    .flat_map(|i| (0..k).map(move |vld| vec![
-                        DataValue::from(i as i64),
-                        DataValue::Validity(Validity::from((vld as i64, true))),
-                        DataValue::from(i as i64),
-                    ]))
+                    .flat_map(|i| {
+                        (0..k).map(move |vld| {
+                            vec![
+                                DataValue::from(i as i64),
+                                DataValue::Validity(Validity::from((vld as i64, true))),
+                                DataValue::from(i as i64),
+                            ]
+                        })
+                    })
                     .collect_vec(),
                 next: None,
             },
         );
         db.import_relations(to_import).unwrap();
-        println!("inserted {} ({} rows) in {:?}", rel, base * k, insert_time.elapsed());
+        println!(
+            "inserted {} ({} rows) in {:?}",
+            rel,
+            base * k,
+            insert_time.elapsed()
+        );
     }
 }
 
@@ -92,7 +110,11 @@ lazy_static! {
             let _ = std::fs::remove_dir_all(&db_path);
         }
 
-        let path_str = if engine == "mem" { "".to_string() } else { db_path.to_string_lossy().into_owned() };
+        let path_str = if engine == "mem" {
+            "".to_string()
+        } else {
+            db_path.to_string_lossy().into_owned()
+        };
         println!("time_travel bench: engine={} path={:?}", engine, path_str);
         let db = DbInstance::new(&engine, &path_str, "").unwrap();
 

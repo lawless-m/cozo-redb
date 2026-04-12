@@ -1,4 +1,4 @@
-name: Build
+name: CI
 
 on:
   push:
@@ -6,19 +6,123 @@ on:
   pull_request:
     branches: [ "main" ]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  test:
+    name: test (${{ matrix.backend }})
     runs-on: ubuntu-latest
-
+    strategy:
+      fail-fast: false
+      matrix:
+        backend:
+          - sqlite
+          - rocksdb
+          - redb
+          - sled
+          - all
+        include:
+          - backend: sqlite
+            features: graph-algo,storage-sqlite
+          - backend: rocksdb
+            features: graph-algo,storage-rocksdb
+          - backend: redb
+            features: graph-algo,storage-redb
+          - backend: sled
+            features: graph-algo,storage-sled
+          - backend: all
+            features: graph-algo,storage-sqlite,storage-rocksdb,storage-redb,storage-sled
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: recursive
-    - name: Build
-      run: cargo build -p cozo --release --verbose
-    - name: Run tests
-      run: cargo test -p cozo --release --verbose
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.backend }}
+      - name: Build
+        run: cargo build -p cozo --no-default-features --features ${{ matrix.features }}
+      - name: Test
+        run: cargo test -p cozo --no-default-features --features ${{ matrix.features }} --lib
+
+  cross-platform:
+    name: cross (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cross-${{ matrix.os }}
+      - name: Build
+        run: cargo build -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb
+      - name: Test
+        run: cargo test -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb --lib
+
+  workspace-members:
+    name: check (${{ matrix.crate }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - crate: cozo-bin
+            features: compact,storage-rocksdb
+          - crate: cozo_c
+            features: compact,storage-rocksdb
+          - crate: cozo_py
+            features: compact,storage-rocksdb
+          - crate: cozo-node
+            features: compact,storage-rocksdb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ws-${{ matrix.crate }}
+      - run: cargo check -p ${{ matrix.crate }} --no-default-features --features ${{ matrix.features }}
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: docs
+      - run: cargo doc --no-deps -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb,storage-redb,storage-sled
+
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: clippy
+      - run: cargo clippy -p cozo --no-default-features --features graph-algo,storage-sqlite,storage-rocksdb,storage-redb,storage-sled

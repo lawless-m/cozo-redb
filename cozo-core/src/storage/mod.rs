@@ -14,6 +14,8 @@ use crate::data::value::ValidityTs;
 use crate::decode_tuple_from_kv;
 
 pub(crate) mod mem;
+#[cfg(feature = "storage-redb")]
+pub(crate) mod re;
 #[cfg(feature = "storage-rocksdb")]
 pub(crate) mod rocks;
 #[cfg(feature = "storage-sled")]
@@ -23,8 +25,6 @@ pub(crate) mod sqlite;
 pub(crate) mod temp;
 #[cfg(feature = "storage-tikv")]
 pub(crate) mod tikv;
-#[cfg(feature = "storage-redb")]
-pub(crate) mod re;
 
 /// Swappable storage trait for Cozo's storage engine
 pub trait Storage<'s>: Send + Sync + Clone {

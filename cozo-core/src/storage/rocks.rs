@@ -14,8 +14,7 @@ use log::warn;
 use miette::{miette, IntoDiagnostic, Result, WrapErr};
 
 use rocksdb::{
-    BlockBasedOptions, OptimisticTransactionDB, Options, SliceTransform,
-    WriteBatchWithTransaction,
+    BlockBasedOptions, OptimisticTransactionDB, Options, SliceTransform, WriteBatchWithTransaction,
 };
 
 use crate::data::tuple::{check_key_for_validity, Tuple};

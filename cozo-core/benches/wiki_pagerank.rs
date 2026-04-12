@@ -20,7 +20,7 @@ use test::Bencher;
 
 use lazy_static::{initialize, lazy_static};
 
-use cozo::{ScriptMutability, DbInstance, NamedRows, DataValue};
+use cozo::{DataValue, DbInstance, NamedRows, ScriptMutability};
 
 lazy_static! {
     static ref TEST_DB: DbInstance = {
@@ -73,7 +73,11 @@ fn wikipedia_pagerank(b: &mut Bencher) {
     initialize(&TEST_DB);
     b.iter(|| {
         TEST_DB
-            .run_script("?[id, rank] <~ PageRank(*article[])", Default::default(), ScriptMutability::Mutable)
+            .run_script(
+                "?[id, rank] <~ PageRank(*article[])",
+                Default::default(),
+                ScriptMutability::Mutable,
+            )
             .unwrap()
     });
 }

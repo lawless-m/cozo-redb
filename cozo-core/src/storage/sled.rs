@@ -502,36 +502,32 @@ impl SledSkipDualIterator<'_> {
                 .transpose()
                 .into_diagnostic()?;
 
-            let (candidate_key, candidate_val): (Vec<u8>, Vec<u8>) =
-                match (stored_nxt, delta_nxt) {
-                    (None, None) => return Ok(None),
-                    (None, Some((dk, dv))) => {
+            let (candidate_key, candidate_val): (Vec<u8>, Vec<u8>) = match (stored_nxt, delta_nxt) {
+                (None, None) => return Ok(None),
+                (None, Some((dk, dv))) => {
+                    if dv[0] == DEL_MARKER {
+                        let (_, nxt_seek) = check_key_for_validity(&dk, self.valid_at, None);
+                        self.next_bound = nxt_seek;
+                        continue;
+                    }
+                    (dk.to_vec(), dv[1..].to_vec())
+                }
+                (Some((sk, sv)), None) => (sk.to_vec(), sv.to_vec()),
+                (Some((sk, sv)), Some((dk, dv))) => {
+                    if sk < dk {
+                        (sk.to_vec(), sv.to_vec())
+                    } else {
                         if dv[0] == DEL_MARKER {
-                            let (_, nxt_seek) =
-                                check_key_for_validity(&dk, self.valid_at, None);
+                            let (_, nxt_seek) = check_key_for_validity(&dk, self.valid_at, None);
                             self.next_bound = nxt_seek;
                             continue;
                         }
                         (dk.to_vec(), dv[1..].to_vec())
                     }
-                    (Some((sk, sv)), None) => (sk.to_vec(), sv.to_vec()),
-                    (Some((sk, sv)), Some((dk, dv))) => {
-                        if sk < dk {
-                            (sk.to_vec(), sv.to_vec())
-                        } else {
-                            if dv[0] == DEL_MARKER {
-                                let (_, nxt_seek) =
-                                    check_key_for_validity(&dk, self.valid_at, None);
-                                self.next_bound = nxt_seek;
-                                continue;
-                            }
-                            (dk.to_vec(), dv[1..].to_vec())
-                        }
-                    }
-                };
+                }
+            };
 
-            let (ret, nxt_bound) =
-                check_key_for_validity(&candidate_key, self.valid_at, None);
+            let (ret, nxt_bound) = check_key_for_validity(&candidate_key, self.valid_at, None);
             self.next_bound = nxt_bound;
             if let Some(mut nk) = ret {
                 extend_tuple_from_v(&mut nk, &candidate_val);
@@ -590,14 +586,20 @@ mod tests {
     fn test_delete() -> Result<()> {
         let (_tmp, db) = setup_test_db()?;
 
-        run(&db, "?[k, v] <- [[1, 'a'], [2, 'b'], [3, 'c']] :put plain {k => v}")?;
+        run(
+            &db,
+            "?[k, v] <- [[1, 'a'], [2, 'b'], [3, 'c']] :put plain {k => v}",
+        )?;
         assert_eq!(run(&db, "?[k, v] := *plain{k, v}")?.rows.len(), 3);
 
         // Delete + read in same imperative script (exercises uncommitted delta)
-        let result = run(&db, r#"
+        let result = run(
+            &db,
+            r#"
             {?[k] <- [[2]] :rm plain {k}}
             {?[k, v] := *plain{k, v}}
-        "#)?;
+        "#,
+        )?;
         assert_eq!(result.rows.len(), 2);
         assert_eq!(result.rows[0][0], DataValue::from(1));
         assert_eq!(result.rows[1][0], DataValue::from(3));
@@ -615,8 +617,10 @@ mod tests {
             crate::NamedRows {
                 headers: vec!["k".into(), "vld".into(), "v".into()],
                 rows: vec![
-                    tt_row(1, 0, 10), tt_row(1, 5, 15),
-                    tt_row(2, 0, 20), tt_row(2, 5, 25),
+                    tt_row(1, 0, 10),
+                    tt_row(1, 5, 15),
+                    tt_row(2, 0, 20),
+                    tt_row(2, 5, 25),
                 ],
                 next: None,
             },

@@ -30,9 +30,7 @@ pub fn new_cozo_redb(path: impl AsRef<Path>) -> Result<crate::Db<RedbStorage>> {
         tx.open_table(TABLE).into_diagnostic()?;
         tx.commit().into_diagnostic()?;
     }
-    let ret = crate::Db::new(RedbStorage {
-        db: Arc::new(db),
-    })?;
+    let ret = crate::Db::new(RedbStorage { db: Arc::new(db) })?;
     ret.initialize()?;
     Ok(ret)
 }
@@ -90,17 +88,22 @@ pub enum RedbTx {
 
 unsafe impl Sync for RedbTx {}
 
-
 impl<'s> StoreTx<'s> for RedbTx {
     fn get(&self, key: &[u8], _for_update: bool) -> Result<Option<Vec<u8>>> {
         match self {
             RedbTx::Read(tx) => {
                 let table = tx.open_table(TABLE).into_diagnostic()?;
-                Ok(table.get(key).into_diagnostic()?.map(|v| v.value().to_vec()))
+                Ok(table
+                    .get(key)
+                    .into_diagnostic()?
+                    .map(|v| v.value().to_vec()))
             }
             RedbTx::Write(Some(tx)) => {
                 let table = tx.open_table(TABLE).into_diagnostic()?;
-                let result = table.get(key).into_diagnostic()?.map(|v| v.value().to_vec());
+                let result = table
+                    .get(key)
+                    .into_diagnostic()?
+                    .map(|v| v.value().to_vec());
                 Ok(result)
             }
             RedbTx::Write(None) => bail!("transaction already committed"),
@@ -216,9 +219,9 @@ impl<'s> StoreTx<'s> for RedbTx {
                     .collect();
                 Box::new(collected.into_iter())
             }
-            RedbTx::Write(None) => {
-                Box::new(std::iter::once(Err(miette::miette!("transaction already committed"))))
-            }
+            RedbTx::Write(None) => Box::new(std::iter::once(Err(miette::miette!(
+                "transaction already committed"
+            )))),
         }
     }
 
@@ -240,15 +243,20 @@ impl<'s> StoreTx<'s> for RedbTx {
     where
         's: 'a,
     {
-        
         match self {
             RedbTx::Read(tx) => {
                 let table = tx.open_table(TABLE).into_diagnostic()?;
-                Ok(table.range::<&[u8]>(lower..upper).into_diagnostic()?.count())
+                Ok(table
+                    .range::<&[u8]>(lower..upper)
+                    .into_diagnostic()?
+                    .count())
             }
             RedbTx::Write(Some(tx)) => {
                 let table = tx.open_table(TABLE).into_diagnostic()?;
-                Ok(table.range::<&[u8]>(lower..upper).into_diagnostic()?.count())
+                Ok(table
+                    .range::<&[u8]>(lower..upper)
+                    .into_diagnostic()?
+                    .count())
             }
             RedbTx::Write(None) => bail!("transaction already committed"),
         }
@@ -264,7 +272,6 @@ impl<'s> StoreTx<'s> for RedbTx {
 
 impl RedbTx {
     fn seek_one(&self, lower: &[u8], upper: &[u8]) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
-        
         match self {
             RedbTx::Read(tx) => {
                 let table = tx.open_table(TABLE).into_diagnostic()?;
@@ -368,7 +375,10 @@ mod tests {
     fn test_basic_operations() -> Result<()> {
         let (_tmp, db) = setup_test_db()?;
 
-        run(&db, "?[k, v] <- [[1, 'a'], [2, 'b'], [3, 'c']] :put plain {k => v}")?;
+        run(
+            &db,
+            "?[k, v] <- [[1, 'a'], [2, 'b'], [3, 'c']] :put plain {k => v}",
+        )?;
         let result = run(&db, "?[k, v] := *plain{k, v}")?;
         assert_eq!(result.rows.len(), 3);
 
@@ -383,12 +393,18 @@ mod tests {
     fn test_delete() -> Result<()> {
         let (_tmp, db) = setup_test_db()?;
 
-        run(&db, "?[k, v] <- [[1, 'a'], [2, 'b'], [3, 'c']] :put plain {k => v}")?;
+        run(
+            &db,
+            "?[k, v] <- [[1, 'a'], [2, 'b'], [3, 'c']] :put plain {k => v}",
+        )?;
 
-        let result = run(&db, r#"
+        let result = run(
+            &db,
+            r#"
             {?[k] <- [[2]] :rm plain {k}}
             {?[k, v] := *plain{k, v}}
-        "#)?;
+        "#,
+        )?;
         assert_eq!(result.rows.len(), 2);
         assert_eq!(result.rows[0][0], DataValue::from(1));
         assert_eq!(result.rows[1][0], DataValue::from(3));
@@ -406,8 +422,10 @@ mod tests {
             crate::NamedRows {
                 headers: vec!["k".into(), "vld".into(), "v".into()],
                 rows: vec![
-                    tt_row(1, 0, 10), tt_row(1, 5, 15),
-                    tt_row(2, 0, 20), tt_row(2, 5, 25),
+                    tt_row(1, 0, 10),
+                    tt_row(1, 5, 15),
+                    tt_row(2, 0, 20),
+                    tt_row(2, 5, 25),
                 ],
                 next: None,
             },
