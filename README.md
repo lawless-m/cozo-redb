@@ -65,66 +65,46 @@ affairs in a single tidy file by means of **redb**, which is, I am told,
 a pure-Rust mmap B-tree; and whilst I could not pretend to explain what
 that is, I am quite sure it is a very respectable thing indeed.
 
-### What does _embeddable_ mean here?
+### Embedded only
 
-A database is almost surely embedded
-if you can use it on a phone which _never_ connects to any network
-(this situation is not as unusual as you might think). SQLite is embedded. MySQL/Postgres/Oracle are client-server.
+A Rust crate that runs in your program's process. No server, no socket,
+no daemon, no port to open. Add `cozo` to your `Cargo.toml`, call it
+from your code, ship one binary.
 
-> A database is _embedded_ if it runs in the same process as your main program.
-> This is in contradistinction to _client-server_ databases, where your program connects to
-> a database server (maybe running on a separate machine) via a client library. Embedded databases
-> generally require no setup and can be used in a much wider range of environments.
+Upstream CozoDB once offered a client-server mode via an HTTP server.
+This fork does not. If you need a client-server graph database,
+`cozo-redb` is not for you.
 
-Upstream CozoDB also offered a client-server mode via an HTTP server; **this fork is
-embedded-only** — the HTTP server has been removed along with the other non-redb
-backends, and `cozo-redb` runs exclusively in the same process as your program.
+### Why graphs
 
-### Why _graphs_?
+Most interesting questions about data are questions about relationships:
+who connects to whom, what leads to what, how far apart two things are.
+SQL can express them, but recursive traversals are awkward and slow.
+`cozo-redb` stores data in ordinary relations and queries them with
+Datalog, which handles recursion natively — shortest-path, reachability,
+and PageRank are one query, not twenty.
 
-Because data are inherently interconnected. Most insights about data can only be obtained if
-you take this interconnectedness into account.
+This is **not** a labelled-property graph database. There are no
+nodes-and-edges primitives. Model your data as relations; the graph is
+whatever the relations describe.
 
-> Most existing _graph_ databases start by requiring you to shoehorn your data into the labelled-property graph model.
-> We don't go this route because we think the traditional relational model is much easier to work with for
-> storing data, much more versatile, and can deal with graph data just fine. Even more importantly,
-> the most piercing insights about data usually come from graph structures _implicit_ several levels deep
-> in your data. The relational model, being an _algebra_, can deal with it just fine. The property graph model,
-> not so much, since that model is not very composable.
+### Why Datalog
 
-### What is so cool about _Datalog_?
+Queries are composed from named rules, not nested subqueries. Recursion
+is first-class — a rule may refer to itself — so graph traversals and
+transitive closures are written directly, without `WITH RECURSIVE`
+gymnastics. Anything SQL can express, Datalog can express, usually more
+cleanly.
 
-Datalog can express all _relational_ queries. _Recursion_ in Datalog is much easier to express,
-much more powerful, and usually runs faster than in SQL. Datalog is also extremely composable:
-you can build your queries piece by piece.
+### Time travel
 
-> Recursion is especially important for graph queries. CozoDB's dialect of Datalog
-> supercharges it even further by allowing recursion through a safe subset of aggregations,
-> and by providing extremely efficient canned algorithms (such as PageRank) for the kinds of recursions
-> frequently required in graph analysis.
->
-> As you learn Datalog, you will discover that the _rules_ of Datalog are like functions
-> in a programming language. Rules are composable, and decomposing a query into rules
-> can make it clearer and more maintainable, with no loss in efficiency.
-> This is unlike the monolithic approach taken by the SQL `select-from-where` in nested forms,
-> which can sometimes read like [golfing](https://en.wikipedia.org/wiki/Code_golf).
+Every relation _may_ track its own history. Updates don't overwrite —
+they append a new version tagged with a validity time. Queries can then
+ask "what did this relation look like last Tuesday?" and get the
+Tuesday answer.
 
-### Time travel?
-
-Time travel in the database setting means
-tracking changes to data over time
-and allowing queries to be logically executed at a point in time
-to get a historical view of the data.
-
-> In a sense, this makes your database _immutable_,
-> since nothing is really deleted from the database ever.
->
-> In Cozo, instead of having all data automatically support
-> time travel, we let you decide if you want the capability
-> for each of your relation. Every extra functionality comes
-> with its cost, and you don't want to pay the price if you don't use it.
->
-Cozo lets you enable time travel per relation, so you only pay the cost on the data that needs it.
+It costs storage and a little query overhead, so it is **opt-in per
+relation**. If a relation doesn't need history, don't enable it.
 
 ### How performant?
 
