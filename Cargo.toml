@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "cozo-core",
-    "cozorocks",
     "cozo-bin",
     "cozo-lib-c",
     "cozo-lib-java",
@@ -16,6 +15,3 @@ members = [
 [profile.bench]
 lto = true
 debug = true
-
-[profile.dev.package."cozorocks"]
-opt-level = 3
