@@ -40,6 +40,8 @@ pub(crate) enum RelAlgebra {
     Filter(FilteredRA),
     Unification(UnificationRA),
     HnswSearch(HnswSearchRA),
+    #[cfg(feature = "fts")]
+    FtsSearch(FtsSearchRA),
 }
 
 impl RelAlgebra {
@@ -55,6 +57,8 @@ impl RelAlgebra {
             RelAlgebra::Unification(i) => i.span,
             RelAlgebra::StoredWithValidity(i) => i.span,
             RelAlgebra::HnswSearch(i) => i.hnsw_search.span,
+            #[cfg(feature = "fts")]
+            RelAlgebra::FtsSearch(i) => i.fts_search.span,
         }
     }
 }
@@ -284,6 +288,12 @@ impl Debug for RelAlgebra {
                 .field(&bindings)
                 .field(&s.hnsw_search.idx_handle.name)
                 .finish(),
+            #[cfg(feature = "fts")]
+            RelAlgebra::FtsSearch(s) => f
+                .debug_tuple("FtsSearch")
+                .field(&bindings)
+                .field(&s.fts_search.manifest.index_name)
+                .finish(),
             RelAlgebra::StoredWithValidity(r) => f
                 .debug_tuple("StoredWithValidity")
                 .field(&bindings)
@@ -351,6 +361,10 @@ impl RelAlgebra {
                 v.fill_binding_indices_and_compile()?;
             }
             RelAlgebra::HnswSearch(s) => {
+                s.fill_binding_indices_and_compile()?;
+            }
+            #[cfg(feature = "fts")]
+            RelAlgebra::FtsSearch(s) => {
                 s.fill_binding_indices_and_compile()?;
             }
             RelAlgebra::StoredWithValidity(v) => {
@@ -450,6 +464,17 @@ impl RelAlgebra {
             | RelAlgebra::NegJoin(_)
             | RelAlgebra::Unification(_)
             | RelAlgebra::HnswSearch(_)) => {
+                let span = filter.span();
+                RelAlgebra::Filter(FilteredRA {
+                    parent: Box::new(s),
+                    filters: vec![filter],
+                    filters_bytecodes: vec![],
+                    to_eliminate: Default::default(),
+                    span,
+                })
+            }
+            #[cfg(feature = "fts")]
+            s @ RelAlgebra::FtsSearch(_) => {
                 let span = filter.span();
                 RelAlgebra::Filter(FilteredRA {
                     parent: Box::new(s),
@@ -599,6 +624,18 @@ impl RelAlgebra {
             parent: Box::new(self),
             hnsw_search,
             filter_bytecode: None,
+            own_bindings,
+        }))
+    }
+    #[cfg(feature = "fts")]
+    pub(crate) fn fts_search(
+        self,
+        fts_search: crate::data::program::FtsSearch,
+        own_bindings: Vec<Symbol>,
+    ) -> Result<Self> {
+        Ok(Self::FtsSearch(FtsSearchRA {
+            parent: Box::new(self),
+            fts_search,
             own_bindings,
         }))
     }
@@ -903,6 +940,81 @@ impl HnswSearchRA {
                 }))
             })
             .map(flatten_err)
+            .flatten_ok();
+        Ok(Box::new(it))
+    }
+}
+
+/// Relational-algebra node for a tantivy-backed FTS search atom.
+///
+/// Constructed by [`RelAlgebra::fts_search`] during query compilation.
+/// At execution time, resolves the live tantivy runtime from the
+/// `SessionTx::fts_cache`, runs the query through tantivy's `QueryParser`,
+/// and joins each matching document's primary key back against the base
+/// relation to produce row tuples in the same shape as a normal relation
+/// scan.
+#[cfg(feature = "fts")]
+#[derive(Debug)]
+pub(crate) struct FtsSearchRA {
+    pub(crate) parent: Box<RelAlgebra>,
+    pub(crate) fts_search: crate::data::program::FtsSearch,
+    pub(crate) own_bindings: Vec<Symbol>,
+}
+
+#[cfg(feature = "fts")]
+impl FtsSearchRA {
+    fn fill_binding_indices_and_compile(&mut self) -> Result<()> {
+        self.parent.fill_binding_indices_and_compile()
+    }
+
+    fn iter<'a>(
+        &'a self,
+        tx: &'a SessionTx<'_>,
+        delta_rule: Option<&MagicSymbol>,
+        stores: &'a BTreeMap<MagicSymbol, EpochStore>,
+    ) -> Result<TupleIter<'a>> {
+        let runtime = tx
+            .fts_cache
+            .get_or_open(&self.fts_search.manifest, &tx.db_path)?;
+        let hits = runtime.search(&self.fts_search.query, self.fts_search.k)?;
+
+        // Each hit gives us an encoded cozo primary-key + a relevance score.
+        // Decode the primary-key back to a tuple of DataValues, fetch the
+        // full row from the base relation, and attach the score.
+        let base = self.fts_search.base_handle.clone();
+        let key_len = base.metadata.keys.len();
+        let has_score = self.fts_search.bind_score.is_some();
+
+        // Cross-product with the parent relation (usually the unit relation
+        // on the left, so this produces one output per hit).
+        let it = self
+            .parent
+            .iter(tx, delta_rule, stores)?
+            .map_ok(move |left_tuple| -> Result<_> {
+                let mut out: Vec<Result<Vec<DataValue>>> = Vec::with_capacity(hits.len());
+                for (key_bytes, score) in &hits {
+                    // Prefix the encoded key with the relation id that
+                    // `encode_key_for_store` would have produced.
+                    let mut full_key = base.id.raw_encode().to_vec();
+                    full_key.extend_from_slice(key_bytes);
+                    let Some(raw_val) = tx.store_tx.get(&full_key, false)? else {
+                        continue;
+                    };
+                    let decoded_key = crate::data::tuple::decode_tuple_from_key(&full_key, key_len);
+                    let mut row = Vec::with_capacity(key_len + base.metadata.non_keys.len() + 1);
+                    row.extend(decoded_key);
+                    crate::runtime::relation::extend_tuple_from_v(&mut row, &raw_val);
+                    if has_score {
+                        row.push(DataValue::from(*score as f64));
+                    }
+                    let mut r = left_tuple.clone();
+                    r.extend(row);
+                    out.push(Ok(r));
+                }
+                Ok(out.into_iter())
+            })
+            .map(flatten_err)
+            .flatten_ok()
             .flatten_ok();
         Ok(Box::new(it))
     }
@@ -1620,6 +1732,8 @@ impl RelAlgebra {
             RelAlgebra::NegJoin(r) => r.do_eliminate_temp_vars(used),
             RelAlgebra::Unification(r) => r.do_eliminate_temp_vars(used),
             RelAlgebra::HnswSearch(_) => Ok(()),
+            #[cfg(feature = "fts")]
+            RelAlgebra::FtsSearch(_) => Ok(()),
         }
     }
 
@@ -1635,6 +1749,8 @@ impl RelAlgebra {
             RelAlgebra::NegJoin(r) => Some(&r.to_eliminate),
             RelAlgebra::Unification(u) => Some(&u.to_eliminate),
             RelAlgebra::HnswSearch(_) => None,
+            #[cfg(feature = "fts")]
+            RelAlgebra::FtsSearch(_) => None,
         }
     }
 
@@ -1669,6 +1785,12 @@ impl RelAlgebra {
                 bindings.extend_from_slice(&s.own_bindings);
                 bindings
             }
+            #[cfg(feature = "fts")]
+            RelAlgebra::FtsSearch(s) => {
+                let mut bindings = s.parent.bindings_after_eliminate();
+                bindings.extend_from_slice(&s.own_bindings);
+                bindings
+            }
         }
     }
     pub(crate) fn iter<'a>(
@@ -1688,6 +1810,8 @@ impl RelAlgebra {
             RelAlgebra::NegJoin(r) => r.iter(tx, delta_rule, stores),
             RelAlgebra::Unification(r) => r.iter(tx, delta_rule, stores),
             RelAlgebra::HnswSearch(r) => r.iter(tx, delta_rule, stores),
+            #[cfg(feature = "fts")]
+            RelAlgebra::FtsSearch(r) => r.iter(tx, delta_rule, stores),
         }
     }
 }
@@ -1868,6 +1992,8 @@ impl InnerJoin {
                 }
             }
             RelAlgebra::HnswSearch(_) => "hnsw_search_join",
+            #[cfg(feature = "fts")]
+            RelAlgebra::FtsSearch(_) => "fts_search_join",
             RelAlgebra::StoredWithValidity(_) => {
                 let join_indices = self
                     .joiner
@@ -1978,6 +2104,10 @@ impl InnerJoin {
             | RelAlgebra::Filter(_)
             | RelAlgebra::Unification(_)
             | RelAlgebra::HnswSearch(_) => {
+                self.materialized_join(tx, eliminate_indices, delta_rule, stores)
+            }
+            #[cfg(feature = "fts")]
+            RelAlgebra::FtsSearch(_) => {
                 self.materialized_join(tx, eliminate_indices, delta_rule, stores)
             }
             RelAlgebra::Reorder(_) => {

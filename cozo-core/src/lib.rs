@@ -60,6 +60,8 @@ pub use crate::runtime::db::ScriptMutability;
 
 pub mod data;
 pub(crate) mod fixed_rule;
+#[cfg(feature = "fts")]
+pub(crate) mod fts;
 pub mod parse;
 pub(crate) mod query;
 pub(crate) mod runtime;

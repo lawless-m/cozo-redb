@@ -29,7 +29,7 @@ use crate::utils::swap_option_result;
 /// This is the fastest storage, but non-persistent.
 /// Supports concurrent readers but only a single writer.
 pub fn new_cozo_mem() -> Result<crate::Db<MemStorage>> {
-    let ret = crate::Db::new(MemStorage::default())?;
+    let ret = crate::Db::new(MemStorage::default(), std::path::PathBuf::new())?;
 
     ret.initialize()?;
     Ok(ret)

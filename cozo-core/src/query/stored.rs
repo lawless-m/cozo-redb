@@ -239,6 +239,10 @@ impl<'a> SessionTx<'a> {
                     || (propagate_triggers && !relation_store.put_triggers.is_empty())));
         let has_indices = !relation_store.indices.is_empty();
         let has_hnsw_indices = !relation_store.hnsw_indices.is_empty();
+        #[cfg(feature = "fts")]
+        let has_fts_indices = !relation_store.fts_indices.is_empty();
+        #[cfg(not(feature = "fts"))]
+        let has_fts_indices = false;
         let mut new_tuples: Vec<DataValue> = vec![];
         let mut old_tuples: Vec<DataValue> = vec![];
 
@@ -287,7 +291,7 @@ impl<'a> SessionTx<'a> {
 
             let val = relation_store.encode_val_for_store(&extracted, span)?;
 
-            if need_to_collect || has_indices || has_hnsw_indices {
+            if need_to_collect || has_indices || has_hnsw_indices || has_fts_indices {
                 if let Some(existing) = self.store_tx.get(&key, false)? {
                     let mut tup = extracted[0..relation_store.metadata.keys.len()].to_vec();
                     extend_tuple_from_v(&mut tup, &existing);
@@ -311,6 +315,11 @@ impl<'a> SessionTx<'a> {
                 }
 
                 self.update_in_hnsw(relation_store, &mut stack, &hnsw_filters, &extracted)?;
+
+                #[cfg(feature = "fts")]
+                if has_fts_indices {
+                    self.upsert_in_fts(relation_store, &key, &extracted)?;
+                }
 
                 if need_to_collect {
                     new_tuples.push(DataValue::List(extracted));
@@ -359,6 +368,71 @@ impl<'a> SessionTx<'a> {
         }
         Ok(())
     }
+    #[cfg(feature = "fts")]
+    fn fts_field_indices(
+        relation_store: &RelationHandle,
+        manifest: &crate::fts::FtsIndexManifest,
+    ) -> Vec<Option<usize>> {
+        manifest
+            .fields
+            .iter()
+            .map(|f| {
+                let name = f.as_str();
+                relation_store
+                    .metadata
+                    .keys
+                    .iter()
+                    .chain(relation_store.metadata.non_keys.iter())
+                    .position(|c| c.name.as_str() == name)
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "fts")]
+    fn upsert_in_fts(
+        &self,
+        relation_store: &RelationHandle,
+        key_bytes: &[u8],
+        row: &[DataValue],
+    ) -> Result<()> {
+        if relation_store.fts_indices.is_empty() {
+            return Ok(());
+        }
+        let db_path = self.db_path.as_ref();
+        // Strip the 9-byte cozo relation-id prefix so the tantivy-side key
+        // matches the search-path convention in `FtsSearchRA::iter`.
+        let stripped = &key_bytes[ENCODED_KEY_MIN_LEN..];
+        for manifest in relation_store.fts_indices.values() {
+            let runtime = self.fts_cache.get_or_open(manifest, db_path)?;
+            let col_idxs = Self::fts_field_indices(relation_store, manifest);
+            let values: Vec<Option<String>> = col_idxs
+                .iter()
+                .map(|ci| ci.and_then(|i| crate::fts::value_as_indexable_text(&row[i])))
+                .collect();
+            runtime.delete_document(stripped)?;
+            runtime.add_document(stripped, &values)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "fts")]
+    fn delete_in_fts(
+        &self,
+        relation_store: &RelationHandle,
+        key_bytes: &[u8],
+    ) -> Result<()> {
+        if relation_store.fts_indices.is_empty() {
+            return Ok(());
+        }
+        let db_path = self.db_path.as_ref();
+        let stripped = &key_bytes[ENCODED_KEY_MIN_LEN..];
+        for manifest in relation_store.fts_indices.values() {
+            let runtime = self.fts_cache.get_or_open(manifest, db_path)?;
+            runtime.delete_document(stripped)?;
+        }
+        Ok(())
+    }
+
     fn make_hnsw_filters(
         relation_store: &RelationHandle,
     ) -> Result<BTreeMap<SmartString<LazyCompact>, Vec<Bytecode>>> {
@@ -417,6 +491,10 @@ impl<'a> SessionTx<'a> {
                     || (propagate_triggers && !relation_store.put_triggers.is_empty())));
         let has_indices = !relation_store.indices.is_empty();
         let has_hnsw_indices = !relation_store.hnsw_indices.is_empty();
+        #[cfg(feature = "fts")]
+        let has_fts_indices = !relation_store.fts_indices.is_empty();
+        #[cfg(not(feature = "fts"))]
+        let has_fts_indices = false;
         let mut new_tuples: Vec<DataValue> = vec![];
         let mut old_tuples: Vec<DataValue> = vec![];
 
@@ -469,7 +547,7 @@ impl<'a> SessionTx<'a> {
             }
             let new_val = relation_store.encode_val_for_store(&new_kv, span)?;
 
-            if need_to_collect || has_indices || has_hnsw_indices {
+            if need_to_collect || has_indices || has_hnsw_indices || has_fts_indices {
                 self.update_in_index(relation_store, &new_kv, &old_kv)?;
 
                 if need_to_collect {
@@ -477,6 +555,11 @@ impl<'a> SessionTx<'a> {
                 }
 
                 self.update_in_hnsw(relation_store, &mut stack, &hnsw_filters, &new_kv)?;
+
+                #[cfg(feature = "fts")]
+                if has_fts_indices {
+                    self.upsert_in_fts(relation_store, &key, &new_kv)?;
+                }
 
                 if need_to_collect {
                     new_tuples.push(DataValue::List(new_kv));
@@ -788,6 +871,10 @@ impl<'a> SessionTx<'a> {
                     || (propagate_triggers && !relation_store.rm_triggers.is_empty())));
         let has_indices = !relation_store.indices.is_empty();
         let has_hnsw_indices = !relation_store.hnsw_indices.is_empty();
+        #[cfg(feature = "fts")]
+        let has_fts_indices = !relation_store.fts_indices.is_empty();
+        #[cfg(not(feature = "fts"))]
+        let has_fts_indices = false;
         let mut new_tuples: Vec<DataValue> = vec![];
         let mut old_tuples: Vec<DataValue> = vec![];
 
@@ -811,7 +898,7 @@ impl<'a> SessionTx<'a> {
                     });
                 }
             }
-            if need_to_collect || has_indices || has_hnsw_indices {
+            if need_to_collect || has_indices || has_hnsw_indices || has_fts_indices {
                 if let Some(existing) = self.store_tx.get(&key, false)? {
                     let mut tup = extracted.clone();
                     extend_tuple_from_v(&mut tup, &existing);
@@ -827,6 +914,10 @@ impl<'a> SessionTx<'a> {
                         for (idx_handle, _) in relation_store.hnsw_indices.values() {
                             self.hnsw_remove(relation_store, idx_handle, &extracted)?;
                         }
+                    }
+                    #[cfg(feature = "fts")]
+                    if has_fts_indices {
+                        self.delete_in_fts(relation_store, &key)?;
                     }
                     if need_to_collect {
                         old_tuples.push(DataValue::List(tup));

@@ -24,13 +24,14 @@ const TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("cozo");
 
 /// Creates a redb database object.
 pub fn new_cozo_redb(path: impl AsRef<Path>) -> Result<crate::Db<RedbStorage>> {
+    let path_buf = path.as_ref().to_path_buf();
     let db = Database::create(path).into_diagnostic()?;
     {
         let tx = db.begin_write().into_diagnostic()?;
         tx.open_table(TABLE).into_diagnostic()?;
         tx.commit().into_diagnostic()?;
     }
-    let ret = crate::Db::new(RedbStorage { db: Arc::new(db) })?;
+    let ret = crate::Db::new(RedbStorage { db: Arc::new(db) }, path_buf)?;
     ret.initialize()?;
     Ok(ret)
 }
@@ -408,6 +409,74 @@ mod tests {
         assert_eq!(r.rows.len(), 2);
         assert_eq!(r.rows[0], vec![DataValue::from(1), DataValue::from(15)]);
         assert_eq!(r.rows[1], vec![DataValue::from(2), DataValue::from(25)]);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "fts")]
+    #[test]
+    fn test_fts_roundtrip() -> Result<()> {
+        let temp_dir = TempDir::new().into_diagnostic()?;
+        let db = new_cozo_redb(temp_dir.path().join("test.redb"))?;
+
+        run(
+            &db,
+            r#"{:create notes {id: Int => title: String, body: String}}"#,
+        )?;
+        run(&db, r#"::fts create notes:ft {fields: [title, body]}"#)?;
+
+        run(
+            &db,
+            r#"
+            ?[id, title, body] <- [
+                [1, 'rust graph database', 'cozo is a datalog database written in rust'],
+                [2, 'python notes', 'unrelated content about snakes'],
+                [3, 'graph theory', 'edges and vertices and rust references'],
+            ]
+            :put notes {id => title, body}
+            "#,
+        )?;
+
+        let hits = run(
+            &db,
+            r#"?[id, score] := ~notes:ft{id | query: "rust", k: 10, bind_score: score}"#,
+        )?;
+        assert_eq!(hits.rows.len(), 2);
+        let ids: Vec<i64> = hits
+            .rows
+            .iter()
+            .map(|r| match &r[0] {
+                DataValue::Num(n) => n.get_int().unwrap(),
+                other => panic!("expected int id, got {:?}", other),
+            })
+            .collect();
+        assert!(ids.contains(&1));
+        assert!(ids.contains(&3));
+
+        run(
+            &db,
+            r#"?[id] <- [[1]] :rm notes {id}"#,
+        )?;
+        let hits = run(
+            &db,
+            r#"?[id] := ~notes:ft{id | query: "rust", k: 10}"#,
+        )?;
+        assert_eq!(hits.rows.len(), 1);
+        assert_eq!(hits.rows[0][0], DataValue::from(3));
+
+        run(
+            &db,
+            r#"?[id, title, body] <- [[2, 'python graph notes', 'rustacean content']]
+               :put notes {id => title, body}"#,
+        )?;
+        let hits = run(
+            &db,
+            r#"?[id] := ~notes:ft{id | query: "rustacean", k: 10}"#,
+        )?;
+        assert_eq!(hits.rows.len(), 1);
+        assert_eq!(hits.rows[0][0], DataValue::from(2));
+
+        run(&db, r#"::fts drop notes:ft"#)?;
 
         Ok(())
     }

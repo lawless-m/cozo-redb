@@ -96,6 +96,14 @@ pub struct Db<S> {
     pub(crate) running_queries: Arc<Mutex<BTreeMap<u64, RunningQueryHandle>>>,
     pub(crate) fixed_rules: Arc<ShardedLock<BTreeMap<String, Arc<Box<dyn FixedRule>>>>>,
     relation_locks: Arc<ShardedLock<BTreeMap<SmartString<LazyCompact>, Arc<ShardedLock<()>>>>>,
+    /// Filesystem path to the underlying persistent store (the `.redb` file
+    /// for the redb backend, or an empty path for in-memory). Used by the
+    /// FTS subsystem to derive the sidecar tantivy directory.
+    pub(crate) db_path: Arc<std::path::PathBuf>,
+    /// Per-Db cache of live tantivy indices. Shared across all transactions
+    /// derived from this Db. Only present when the `fts` feature is enabled.
+    #[cfg(feature = "fts")]
+    pub(crate) fts_cache: Arc<crate::fts::FtsIndexCache>,
 }
 
 impl<S> Debug for Db<S> {
@@ -203,7 +211,11 @@ impl<'s, S: Storage<'s>> Db<S> {
     /// Create a new database object with the given storage.
     /// You must call [`initialize`](Self::initialize) immediately after creation.
     /// Due to lifetime restrictions we are not able to call that for you automatically.
-    pub fn new(storage: S) -> Result<Self> {
+    ///
+    /// `db_path` is the filesystem path of the persistent store (for redb) or
+    /// an empty path (for in-memory). It is used by the FTS subsystem to
+    /// derive sidecar tantivy directory locations.
+    pub fn new(storage: S, db_path: impl Into<std::path::PathBuf>) -> Result<Self> {
         let ret = Self {
             db: storage,
             temp_db: Default::default(),
@@ -212,6 +224,9 @@ impl<'s, S: Storage<'s>> Db<S> {
             running_queries: Default::default(),
             fixed_rules: Arc::new(ShardedLock::new(DEFAULT_FIXED_RULES.clone())),
             relation_locks: Default::default(),
+            db_path: Arc::new(db_path.into()),
+            #[cfg(feature = "fts")]
+            fts_cache: Arc::new(crate::fts::FtsIndexCache::default()),
         };
         Ok(ret)
     }
@@ -513,6 +528,10 @@ impl<'s, S: Storage<'s>> Db<S> {
             temp_store_tx: self.temp_db.transact(true)?,
             relation_store_id: self.relation_store_id.clone(),
             temp_store_id: Default::default(),
+            #[cfg(feature = "fts")]
+            fts_cache: self.fts_cache.clone(),
+            #[cfg(feature = "fts")]
+            db_path: self.db_path.clone(),
         };
         Ok(ret)
     }
@@ -522,6 +541,10 @@ impl<'s, S: Storage<'s>> Db<S> {
             temp_store_tx: self.temp_db.transact(true)?,
             relation_store_id: self.relation_store_id.clone(),
             temp_store_id: Default::default(),
+            #[cfg(feature = "fts")]
+            fts_cache: self.fts_cache.clone(),
+            #[cfg(feature = "fts")]
+            db_path: self.db_path.clone(),
         };
         Ok(ret)
     }
@@ -753,6 +776,16 @@ impl<'s, S: Storage<'s>> Db<S> {
                                             .map(|f| f.to_string())
                                             .collect_vec()),
                                     ),
+                                    #[cfg(feature = "fts")]
+                                    RelAlgebra::FtsSearch(fts) => {
+                                        rel_stack.push(&fts.parent);
+                                        (
+                                            "fts_index",
+                                            json!(format!(":{}", fts.fts_search.base_handle.name)),
+                                            json!(fts.fts_search.manifest.index_name.to_string()),
+                                            json!(fts.fts_search.query),
+                                        )
+                                    }
                                 };
                                 ret_for_relation.push(json!({
                                     STRATUM: stratum,
@@ -895,6 +928,26 @@ impl<'s, S: Storage<'s>> Db<S> {
                         .unwrap();
                     let _guard = lock.write().unwrap();
                     tx.create_hnsw_index(config)?;
+                }
+                Ok(NamedRows::new(
+                    vec![STATUS_STR.to_string()],
+                    vec![vec![DataValue::from(OK_STR)]],
+                ))
+            }
+            #[cfg(feature = "fts")]
+            SysOp::CreateFtsIndex(config) => {
+                if read_only {
+                    bail!("Cannot create fts index in read-only mode");
+                }
+                if skip_locking {
+                    tx.create_fts_index(config)?;
+                } else {
+                    let lock = self
+                        .obtain_relation_locks(iter::once(&config.base_relation))
+                        .pop()
+                        .unwrap();
+                    let _guard = lock.write().unwrap();
+                    tx.create_fts_index(config)?;
                 }
                 Ok(NamedRows::new(
                     vec![STATUS_STR.to_string()],

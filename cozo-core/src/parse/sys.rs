@@ -42,8 +42,22 @@ pub enum SysOp {
     SetAccessLevel(Vec<Symbol>, AccessLevel),
     CreateIndex(Symbol, Symbol, Vec<Symbol>),
     CreateVectorIndex(HnswIndexConfig),
+    #[cfg(feature = "fts")]
+    CreateFtsIndex(FtsIndexConfig),
     RemoveIndex(Symbol, Symbol),
     DescribeRelation(Symbol, SmartString<LazyCompact>),
+}
+
+/// Config captured by the parser for a `::fts create rel:ft { fields: [...] }`
+/// DDL command. Handed off to [`SessionTx::create_fts_index`] which
+/// materialises the backing tantivy index and records the manifest on the
+/// relation handle.
+#[cfg(feature = "fts")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FtsIndexConfig {
+    pub base_relation: SmartString<LazyCompact>,
+    pub index_name: SmartString<LazyCompact>,
+    pub fields: Vec<SmartString<LazyCompact>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -302,6 +316,42 @@ pub(crate) fn parse_sys(
                         index_filter,
                         extend_candidates,
                         keep_pruned_connections,
+                    })
+                }
+                Rule::index_drop => {
+                    let mut inner = inner.into_inner();
+                    let rel = inner.next().unwrap();
+                    let name = inner.next().unwrap();
+                    SysOp::RemoveIndex(
+                        Symbol::new(rel.as_str(), rel.extract_span()),
+                        Symbol::new(name.as_str(), name.extract_span()),
+                    )
+                }
+                r => unreachable!("{:?}", r),
+            }
+        }
+        #[cfg(feature = "fts")]
+        Rule::fts_idx_op => {
+            let inner = inner.into_inner().next().unwrap();
+            match inner.as_rule() {
+                Rule::fts_index_create => {
+                    let mut inner = inner.into_inner();
+                    let rel = inner.next().unwrap();
+                    let name = inner.next().unwrap();
+                    let fields: Vec<SmartString<LazyCompact>> = inner
+                        .map(|p| SmartString::from(p.as_str()))
+                        .collect();
+                    if fields.is_empty() {
+                        #[derive(Debug, miette::Diagnostic, thiserror::Error)]
+                        #[error("`::fts create` requires at least one field")]
+                        #[diagnostic(code(parser::empty_fts_fields))]
+                        struct EmptyFtsFields(#[label] SourceSpan);
+                        bail!(EmptyFtsFields(rel.extract_span()));
+                    }
+                    SysOp::CreateFtsIndex(FtsIndexConfig {
+                        base_relation: SmartString::from(rel.as_str()),
+                        index_name: SmartString::from(name.as_str()),
+                        fields,
                     })
                 }
                 Rule::index_drop => {

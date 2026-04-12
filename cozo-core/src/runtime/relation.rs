@@ -82,15 +82,32 @@ pub(crate) struct RelationHandle {
     pub(crate) indices: BTreeMap<SmartString<LazyCompact>, (RelationHandle, Vec<usize>)>,
     pub(crate) hnsw_indices:
         BTreeMap<SmartString<LazyCompact>, (RelationHandle, HnswIndexManifest)>,
+    #[cfg(feature = "fts")]
+    #[serde(default)]
+    pub(crate) fts_indices: BTreeMap<SmartString<LazyCompact>, crate::fts::FtsIndexManifest>,
     pub(crate) description: SmartString<LazyCompact>,
 }
 
 impl RelationHandle {
     pub(crate) fn has_index(&self, index_name: &str) -> bool {
-        self.indices.contains_key(index_name) || self.hnsw_indices.contains_key(index_name)
+        if self.indices.contains_key(index_name) || self.hnsw_indices.contains_key(index_name) {
+            return true;
+        }
+        #[cfg(feature = "fts")]
+        if self.fts_indices.contains_key(index_name) {
+            return true;
+        }
+        false
     }
     pub(crate) fn has_no_index(&self) -> bool {
-        self.indices.is_empty() && self.hnsw_indices.is_empty()
+        if !self.indices.is_empty() || !self.hnsw_indices.is_empty() {
+            return false;
+        }
+        #[cfg(feature = "fts")]
+        if !self.fts_indices.is_empty() {
+            return false;
+        }
+        true
     }
 }
 
@@ -604,6 +621,8 @@ impl<'a> SessionTx<'a> {
             is_temp,
             indices: Default::default(),
             hnsw_indices: Default::default(),
+            #[cfg(feature = "fts")]
+            fts_indices: Default::default(),
             description: Default::default(),
         };
 
@@ -720,6 +739,102 @@ impl<'a> SessionTx<'a> {
 
         Ok(())
     }
+
+    /// Create a new full-text search index on an existing relation.
+    ///
+    /// Pulls all current rows out of the base relation, writes them into the
+    /// tantivy sidecar directory derived from the enclosing database's path,
+    /// commits the tantivy writer, and records the [`FtsIndexManifest`] on
+    /// the updated `RelationHandle` so subsequent queries can find it.
+    #[cfg(feature = "fts")]
+    pub(crate) fn create_fts_index(
+        &mut self,
+        config: &crate::parse::sys::FtsIndexConfig,
+    ) -> Result<()> {
+        use crate::fts::{value_as_indexable_text, FtsIndexManifest};
+        let mut rel_handle = self.get_relation(&config.base_relation, true)?;
+
+        if rel_handle.has_index(&config.index_name) {
+            bail!(IndexAlreadyExists(
+                config.index_name.to_string(),
+                config.index_name.to_string()
+            ));
+        }
+
+        // Resolve the indexed columns to their positions in the row layout.
+        let mut field_positions: Vec<usize> = Vec::with_capacity(config.fields.len());
+        for field_name in &config.fields {
+            let mut found = None;
+            for (idx, col) in rel_handle
+                .metadata
+                .keys
+                .iter()
+                .chain(rel_handle.metadata.non_keys.iter())
+                .enumerate()
+            {
+                if col.name == *field_name {
+                    found = Some(idx);
+                    break;
+                }
+            }
+            let Some(pos) = found else {
+                #[derive(Debug, Error, Diagnostic)]
+                #[error("Column `{0}` not found on relation `{1}`")]
+                #[diagnostic(code(tx::fts_unknown_column))]
+                struct UnknownFtsColumn(String, String);
+                bail!(UnknownFtsColumn(
+                    field_name.to_string(),
+                    config.base_relation.to_string(),
+                ));
+            };
+            field_positions.push(pos);
+        }
+
+        let manifest = FtsIndexManifest {
+            base_relation: config.base_relation.clone(),
+            index_name: config.index_name.clone(),
+            fields: config.fields.clone(),
+        };
+
+        // Prepare the tantivy runtime via the shared cache, then populate it
+        // with the existing rows of the relation.
+        let runtime = self.fts_cache.get_or_open(&manifest, &self.db_path)?;
+        let key_len = rel_handle.metadata.keys.len();
+        let mut existing = TempCollector::default();
+        for tuple in rel_handle.scan_all(self) {
+            existing.push(tuple?);
+        }
+        for tuple in existing.into_iter() {
+            let key_bytes = rel_handle
+                .encode_key_for_store(&tuple[..key_len], Default::default())?;
+            // Strip the 9-byte cozo relation-id prefix so the stored key
+            // matches what runtime search paths will use to look up the row.
+            let key_bytes = key_bytes[ENCODED_KEY_MIN_LEN..].to_vec();
+            let field_values: Vec<Option<String>> = field_positions
+                .iter()
+                .map(|pos| value_as_indexable_text(&tuple[*pos]))
+                .collect();
+            runtime.add_document(&key_bytes, &field_values)?;
+        }
+        runtime.commit_pending()?;
+
+        rel_handle
+            .fts_indices
+            .insert(manifest.index_name.clone(), manifest);
+
+        // Persist the updated relation handle back to the meta relation so
+        // reopening the database recovers the index.
+        let name_key =
+            vec![DataValue::from(&rel_handle.name as &str)].encode_as_key(RelationId::SYSTEM);
+        let mut meta_val = vec![];
+        rel_handle
+            .serialize(&mut Serializer::new(&mut meta_val))
+            .unwrap();
+        self.store_tx.put(&name_key, &meta_val)?;
+
+        Ok(())
+    }
+
     pub(crate) fn create_hnsw_index(&mut self, config: &HnswIndexConfig) -> Result<()> {
         // Get relation handle
         let mut rel_handle = self.get_relation(&config.base_relation, true)?;
@@ -1074,9 +1189,14 @@ impl<'a> SessionTx<'a> {
         idx_name: &Symbol,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
         let mut rel = self.get_relation(rel_name, true)?;
-        if rel.indices.remove(&idx_name.name).is_none()
-            && rel.hnsw_indices.remove(&idx_name.name).is_none()
-        {
+        let removed_plain = rel.indices.remove(&idx_name.name).is_some();
+        let removed_hnsw = rel.hnsw_indices.remove(&idx_name.name).is_some();
+        #[cfg(feature = "fts")]
+        let removed_fts = rel.fts_indices.remove(&idx_name.name).is_some();
+        #[cfg(not(feature = "fts"))]
+        let removed_fts = false;
+
+        if !removed_plain && !removed_hnsw && !removed_fts {
             #[derive(Debug, Error, Diagnostic)]
             #[error("index {0} for relation {1} not found")]
             #[diagnostic(code(tx::idx_not_found))]
@@ -1085,7 +1205,16 @@ impl<'a> SessionTx<'a> {
             bail!(IndexNotFound(idx_name.to_string(), rel_name.to_string()));
         }
 
-        let to_clean = self.destroy_relation(&format!("{}:{}", rel_name.name, idx_name.name))?;
+        let to_clean = if removed_fts {
+            #[cfg(feature = "fts")]
+            {
+                self.fts_cache
+                    .drop_index(&rel_name.name, &idx_name.name, &self.db_path)?;
+            }
+            Vec::new()
+        } else {
+            self.destroy_relation(&format!("{}:{}", rel_name.name, idx_name.name))?
+        };
 
         let new_encoded =
             vec![DataValue::from(&rel_name.name as &str)].encode_as_key(RelationId::SYSTEM);

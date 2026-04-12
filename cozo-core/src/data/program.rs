@@ -988,11 +988,31 @@ pub(crate) struct HnswSearch {
     pub(crate) span: SourceSpan,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FtsScoreKind {
-    TfIdf,
-    Tf,
+#[cfg(feature = "fts")]
+#[derive(Clone, Debug)]
+pub(crate) struct FtsSearch {
+    pub(crate) base_handle: RelationHandle,
+    pub(crate) manifest: crate::fts::FtsIndexManifest,
+    /// Column bindings into the base relation, one per keys+non_keys column,
+    /// in column order.
+    pub(crate) bindings: Vec<Symbol>,
+    /// Max number of matches to return (`k` parameter in the search atom).
+    pub(crate) k: usize,
+    /// Raw Lucene-style query string, parsed by tantivy's `QueryParser` at
+    /// execution time.
+    pub(crate) query: String,
+    /// Optional binding that receives each match's tantivy relevance score.
+    pub(crate) bind_score: Option<Symbol>,
+    pub(crate) span: SourceSpan,
 }
+
+#[cfg(feature = "fts")]
+impl FtsSearch {
+    pub(crate) fn all_bindings(&self) -> impl Iterator<Item = &Symbol> {
+        self.bindings.iter().chain(self.bind_score.iter())
+    }
+}
+
 impl HnswSearch {
     pub(crate) fn all_bindings(&self) -> impl Iterator<Item = &Symbol> {
         self.bindings
@@ -1251,6 +1271,10 @@ impl SearchInput {
         {
             return self.normalize_hnsw(base_handle, idx_handle, manifest, gen);
         }
+        #[cfg(feature = "fts")]
+        if let Some(manifest) = base_handle.fts_indices.get(&self.index.name).cloned() {
+            return self.normalize_fts(base_handle, manifest, gen);
+        }
         #[derive(Debug, Error, Diagnostic)]
         #[error("Index {name} not found on relation {relation}")]
         #[diagnostic(code(eval::hnsw_index_not_found))]
@@ -1265,6 +1289,129 @@ impl SearchInput {
             name: self.index.to_string(),
             span: self.span,
         })
+    }
+
+    /// Normalize a `~rel:ft{query: "...", k: 10, bind_score: score}` search
+    /// atom into a `NormalFormAtom::FtsSearch`. Validates that `query` and
+    /// `k` were supplied, pulls `bind_score` if present, binds each column
+    /// of the base relation.
+    #[cfg(feature = "fts")]
+    fn normalize_fts(
+        mut self,
+        base_handle: RelationHandle,
+        manifest: crate::fts::FtsIndexManifest,
+        gen: &mut TempSymbGen,
+    ) -> Result<Disjunction> {
+        let mut conj = Vec::with_capacity(8);
+        let mut bindings = Vec::with_capacity(base_handle.metadata.keys.len() + base_handle.metadata.non_keys.len());
+        let mut seen_variables = BTreeSet::new();
+
+        // Bind every column of the base relation (keys + non_keys).
+        for col in base_handle
+            .metadata
+            .keys
+            .iter()
+            .chain(base_handle.metadata.non_keys.iter())
+        {
+            if let Some(arg) = self.bindings.remove(&col.name) {
+                match arg {
+                    Expr::Binding { var, .. } => {
+                        if var.is_ignored_symbol() {
+                            bindings.push(gen.next_ignored(var.span));
+                        } else if seen_variables.insert(var.clone()) {
+                            bindings.push(var);
+                        } else {
+                            let span = var.span;
+                            let kw = gen.next(span);
+                            let unif = NormalFormAtom::Unification(Unification {
+                                binding: kw.clone(),
+                                expr: Expr::Binding { var, tuple_pos: None },
+                                one_many_unif: false,
+                                span,
+                            });
+                            conj.push(unif);
+                            bindings.push(kw);
+                        }
+                    }
+                    expr => {
+                        let span = expr.span();
+                        let kw = gen.next(span);
+                        let unif = NormalFormAtom::Unification(Unification {
+                            binding: kw.clone(),
+                            expr,
+                            one_many_unif: false,
+                            span,
+                        });
+                        conj.push(unif);
+                        bindings.push(kw);
+                    }
+                }
+            } else {
+                bindings.push(gen.next_ignored(self.span));
+            }
+        }
+
+        // Pull `query` — must be a literal string for v1.
+        let query_expr = self.parameters.remove("query").ok_or_else(|| {
+            miette::miette!("`~{}:{}` search requires a `query` parameter", self.relation, self.index)
+        })?;
+        let query = match query_expr {
+            Expr::Const { val: DataValue::Str(s), .. } => s.to_string(),
+            other => bail!(
+                "`~{}:{}` expects `query` to be a string literal, got {:?}",
+                self.relation,
+                self.index,
+                other
+            ),
+        };
+
+        // Pull `k` — must be a non-negative integer literal.
+        let k_expr = self.parameters.remove("k").ok_or_else(|| {
+            miette::miette!("`~{}:{}` search requires a `k` parameter", self.relation, self.index)
+        })?;
+        let k = match k_expr {
+            Expr::Const { val: DataValue::Num(n), .. } => {
+                let v = n.get_int().unwrap_or(-1);
+                if v < 0 {
+                    bail!("`k` must be a non-negative integer");
+                }
+                v as usize
+            }
+            other => bail!("`k` must be an integer literal, got {:?}", other),
+        };
+
+        // Optional `bind_score` binding.
+        let bind_score = match self.parameters.remove("bind_score") {
+            None => None,
+            Some(Expr::Binding { var, .. }) => Some(var),
+            Some(other) => {
+                let span = other.span();
+                let kw = gen.next(span);
+                conj.push(NormalFormAtom::Unification(Unification {
+                    binding: kw.clone(),
+                    expr: other,
+                    one_many_unif: false,
+                    span,
+                }));
+                Some(kw)
+            }
+        };
+
+        if !self.parameters.is_empty() {
+            bail!("Unexpected parameters for FTS search: {:?}", self.parameters);
+        }
+
+        conj.push(NormalFormAtom::FtsSearch(FtsSearch {
+            base_handle,
+            manifest,
+            bindings,
+            k,
+            query,
+            bind_score,
+            span: self.span,
+        }));
+
+        Ok(Disjunction::conj(conj))
     }
 }
 
@@ -1389,6 +1536,8 @@ pub(crate) enum NormalFormAtom {
     Predicate(Expr),
     Unification(Unification),
     HnswSearch(HnswSearch),
+    #[cfg(feature = "fts")]
+    FtsSearch(FtsSearch),
 }
 
 #[derive(Debug, Clone)]
@@ -1400,6 +1549,8 @@ pub(crate) enum MagicAtom {
     NegatedRelation(MagicRelationApplyAtom),
     Unification(Unification),
     HnswSearch(HnswSearch),
+    #[cfg(feature = "fts")]
+    FtsSearch(FtsSearch),
 }
 
 #[derive(Clone, Debug)]

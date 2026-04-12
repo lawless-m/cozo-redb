@@ -183,6 +183,14 @@ impl ImperativeStmt {
                         m.base_relation, m.index_name
                     )));
                 }
+                #[cfg(feature = "fts")]
+                SysOp::CreateFtsIndex(m) => {
+                    collector.insert(m.base_relation.clone());
+                    collector.insert(SmartString::from(format!(
+                        "{}:{}",
+                        m.base_relation, m.index_name
+                    )));
+                }
                 SysOp::RemoveIndex(rel, idx) => {
                     collector.insert(SmartString::from(format!("{}:{}", rel.name, idx.name)));
                 }

@@ -80,6 +80,11 @@ impl NormalFormInlineRule {
                         pending.push(NormalFormAtom::HnswSearch(s));
                     }
                 }
+                #[cfg(feature = "fts")]
+                NormalFormAtom::FtsSearch(s) => {
+                    seen_variables.extend(s.all_bindings().cloned());
+                    round_1_collected.push(NormalFormAtom::FtsSearch(s));
+                }
             }
         }
 
@@ -112,6 +117,11 @@ impl NormalFormInlineRule {
                     seen_variables.extend(s.all_bindings().cloned());
                     collected.push(NormalFormAtom::HnswSearch(s));
                 }
+                #[cfg(feature = "fts")]
+                NormalFormAtom::FtsSearch(s) => {
+                    seen_variables.extend(s.all_bindings().cloned());
+                    collected.push(NormalFormAtom::FtsSearch(s));
+                }
             }
             for atom in last_pending.iter() {
                 match atom {
@@ -137,6 +147,13 @@ impl NormalFormInlineRule {
                         } else {
                             pending.push(NormalFormAtom::HnswSearch(s.clone()));
                         }
+                    }
+                    #[cfg(feature = "fts")]
+                    NormalFormAtom::FtsSearch(s) => {
+                        // FTS search is always eager — no bound variable to
+                        // wait on, the query string is a literal.
+                        seen_variables.extend(s.all_bindings().cloned());
+                        collected.push(NormalFormAtom::FtsSearch(s.clone()));
                     }
                     NormalFormAtom::Predicate(p) => {
                         if p.bindings()?.is_subset(&seen_variables) {
@@ -181,6 +198,10 @@ impl NormalFormInlineRule {
                         bail!(UnboundVariable(u.span))
                     }
                     NormalFormAtom::HnswSearch(s) => {
+                        bail!(UnboundVariable(s.span))
+                    }
+                    #[cfg(feature = "fts")]
+                    NormalFormAtom::FtsSearch(s) => {
                         bail!(UnboundVariable(s.span))
                     }
                 }

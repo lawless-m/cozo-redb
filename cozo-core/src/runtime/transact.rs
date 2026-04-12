@@ -25,6 +25,16 @@ pub struct SessionTx<'a> {
     pub(crate) temp_store_tx: TempTx,
     pub(crate) relation_store_id: Arc<AtomicU64>,
     pub(crate) temp_store_id: AtomicU32,
+    /// Shared full-text search index cache from the parent [`Db`]. Populated
+    /// with a clone of `Db::fts_cache` when a transaction is opened so that
+    /// read-path queries and write-path hooks can reach live tantivy
+    /// runtimes without needing a reference to the Db.
+    #[cfg(feature = "fts")]
+    pub(crate) fts_cache: Arc<crate::fts::FtsIndexCache>,
+    /// Path to the underlying storage file, used by the FTS subsystem to
+    /// derive tantivy sidecar directory locations.
+    #[cfg(feature = "fts")]
+    pub(crate) db_path: Arc<std::path::PathBuf>,
 }
 
 pub const CURRENT_STORAGE_VERSION: [u8; 1] = [0x00];
@@ -132,6 +142,8 @@ impl<'a> SessionTx<'a> {
 
     pub fn commit_tx(&mut self) -> Result<()> {
         self.store_tx.commit()?;
+        #[cfg(feature = "fts")]
+        self.fts_cache.commit_all_pending()?;
         Ok(())
     }
 }

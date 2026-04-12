@@ -16,12 +16,17 @@ exclude = [
 #! # Features
 
 default = ["compact"]
-## Enables the `minimal`, `requests` and `graph-algo` features.
-compact = ["storage-redb", "requests", "graph-algo"]
+## Enables the `storage-redb`, `requests`, `graph-algo`, and `fts` features.
+compact = ["storage-redb", "requests", "graph-algo", "fts"]
 ## Enables the [redb](https://github.com/cberner/redb) backend.
 ## Pure Rust, single-file, ACID transactions, supports time travel. The only
 ## persistent backend shipped by this fork.
 storage-redb = ["dep:redb"]
+## Enables full-text search via [tantivy](https://github.com/quickwit-oss/tantivy).
+## Adds the `~rel:ft{query: "..."}` CozoScript syntax backed by a tantivy index
+## sidecar directory. Requires `storage-redb` at the moment since the index
+## path is derived from the redb file location.
+fts = ["dep:tantivy"]
 ## Enables the graph algorithms.
 graph-algo = ["graph", "rayon"]
 ## Allows the utilities to make web requests to fetch data.
@@ -72,6 +77,7 @@ document-features = "0.2.8"
 rayon = { version = "1.10.0", optional = true }
 minreq = { version = "2.11.2", features = ["https-rustls"], optional = true }
 redb = { version = "4.0.0", optional = true }
+tantivy = { version = "0.22", optional = true }
 js-sys = { version = "0.3.60", optional = true }
 graph = { version = "0.3.1", optional = true }
 crossbeam = "0.8.4"
