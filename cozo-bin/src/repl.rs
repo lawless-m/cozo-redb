@@ -14,7 +14,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 
-use clap::Args;
+use clap::Parser;
 use miette::{bail, miette, IntoDiagnostic};
 use rustyline::history::DefaultHistory;
 use rustyline::Changeset;
@@ -62,7 +62,8 @@ impl rustyline::validate::Validator for Indented {
     }
 }
 
-#[derive(Args, Debug)]
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
 pub(crate) struct ReplArgs {
     /// Database engine: `mem` (non-persistent) or `redb` (persistent).
     #[clap(short, long, default_value_t = String::from("mem"))]

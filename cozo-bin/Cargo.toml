@@ -3,13 +3,9 @@ name = "cozo-bin"
 version = "0.7.6"
 edition = "2021"
 license = "MPL-2.0"
-description = "Standalone Cozo database"
-authors = ["Ziyang Hu"]
-homepage = "https://www.cozodb.org"
-repository = "https://github.com/cozodb/cozo"
-documentation = "https://docs.cozodb.org"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Standalone CozoDB REPL"
+authors = ["Ziyang Hu", "Matt Lawless"]
+repository = "https://github.com/lawless-m/cozo-rs"
 
 [features]
 #! # Features
@@ -24,30 +20,12 @@ graph-algo = ["cozo/graph-algo"]
 ## Allows the utilities to make web requests to fetch data
 requests = ["cozo/requests"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 cozo = { version = "0.7.6", path = "../cozo-core", default-features = false }
 clap = { version = "4.5.4", features = ["derive"] }
-env_logger = "0.11.3"
-log = "0.4.21"
-rand = "0.8.5"
-serde_derive = "1.0.199"
-serde = { version = "1.0.199" }
-chrono = "0.4.38"
+miette = { version = "5.10.0", features = ["fancy"] }
 serde_json = "1.0.116"
 prettytable = "0.10.0"
 rustyline = "14.0.0"
 minreq = { version = "2.11.2", features = ["https-rustls"] }
-miette = { version = "5.10.0", features = ["fancy"] }
 ctrlc = "3.4.4"
-axum = "0.7.5"
-axum-macros = "0.4.1"
-itertools = "0.12.1"
-tokio = { version = "1.37.0", features = ["full"] }
-async-stream = "0.3.5"
-futures = "0.3.30"
-crossbeam = "0.8.4"
-eventsource-client = "0.12.2"
-tower-http = { version = "0.5.2", features = ["full"] }
-rayon = "1.10.0"
