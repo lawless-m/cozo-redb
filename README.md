@@ -261,8 +261,8 @@ with each layer only calling into the layer below:
 
 The storage engine defines a `Storage` trait — a key-value interface over binary blobs
 with range scan — and several implementations that plug into it: in-memory, SQLite,
-RocksDB, and redb. A TiKV client backend exists in the tree but is not exercised
-in this fork. Rust embedders can also provide custom backends by implementing the trait.
+RocksDB, and redb. Rust embedders can also provide custom backends by implementing
+the trait.
 
 The SQLite backend also doubles as the backup/interchange file format, so you can
 move data between backends by round-tripping through a SQLite export.

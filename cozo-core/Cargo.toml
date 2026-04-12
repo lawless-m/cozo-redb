@@ -44,17 +44,9 @@ io-uring = ["rocksdb?/io-uring"]
 ## Polyfills for the WASM target
 wasm = ["uuid/js", "dep:js-sys"]
 
-#! The following features are highly experimental:
-
 ## Enables the [redb](https://github.com/cberner/redb) backend.
 ## Pure Rust, single-file, ACID transactions, supports time travel.
 storage-redb = ["dep:redb"]
-## Enables the [TiKV](https://tikv.org/) client backend.
-## The only reason that you may want to use this is that your data does not fit in a single machine.
-## This engine is orders of magnitude slower than every other engine for graph traversals, due to the
-## significant network overhead. Simple point-lookup queries are fine, though.
-## The TiKV engine does not support time travel.
-storage-tikv = ["dep:tikv-client", "dep:tokio"]
 
 #! # Recommendation for features to enable
 #!
@@ -119,8 +111,6 @@ minreq = { version = "2.11.2", features = ["https-rustls"], optional = true }
 tikv-jemallocator-global = { version = "0.5.0", optional = true }
 rocksdb = { version = "0.22.0", optional = true }
 redb = { version = "4.0.0", optional = true }
-tikv-client = { version = "0.3.0", optional = true }
-tokio = { version = "1.37.0", optional = true }
 sqlite = { version = "0.36.0", optional = true }
 sqlite3-src = { version = "0.6.1", optional = true }
 js-sys = { version = "0.3.60", optional = true }

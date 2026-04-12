@@ -21,8 +21,6 @@ pub(crate) mod rocks;
 #[cfg(feature = "storage-sqlite")]
 pub(crate) mod sqlite;
 pub(crate) mod temp;
-#[cfg(feature = "storage-tikv")]
-pub(crate) mod tikv;
 
 /// Swappable storage trait for Cozo's storage engine
 pub trait Storage<'s>: Send + Sync + Clone {
