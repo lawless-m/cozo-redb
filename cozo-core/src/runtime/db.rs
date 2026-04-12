@@ -6,7 +6,6 @@
  * You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 use std::default::Default;
 use std::fmt::{Debug, Formatter};
@@ -509,33 +508,6 @@ impl<'s, S: Storage<'s>> Db<S> {
         tx.commit_tx()?;
         Ok(())
     }
-    /// Register a custom fixed rule implementation.
-    pub fn register_fixed_rule<R>(&self, name: String, rule_impl: R) -> Result<()>
-    where
-        R: FixedRule + 'static,
-    {
-        match self.fixed_rules.write().unwrap().entry(name) {
-            Entry::Vacant(ent) => {
-                ent.insert(Arc::new(Box::new(rule_impl)));
-                Ok(())
-            }
-            Entry::Occupied(ent) => {
-                bail!(
-                    "A fixed rule with the name {} is already registered",
-                    ent.key()
-                )
-            }
-        }
-    }
-
-    /// Unregister a custom fixed rule implementation.
-    pub fn unregister_fixed_rule(&self, name: &str) -> Result<bool> {
-        if DEFAULT_FIXED_RULES.contains_key(name) {
-            bail!("Cannot unregister builtin fixed rule {}", name);
-        }
-        Ok(self.fixed_rules.write().unwrap().remove(name).is_some())
-    }
-
     pub(crate) fn obtain_relation_locks<'a, T: Iterator<Item = &'a SmartString<LazyCompact>>>(
         &'s self,
         rels: T,
