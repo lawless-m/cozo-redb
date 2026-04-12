@@ -1443,14 +1443,6 @@ pub(crate) fn op_regex_extract_first(args: &[DataValue]) -> Result<DataValue> {
     }
 }
 
-define_op!(OP_T2S, 1, false);
-fn op_t2s(args: &[DataValue]) -> Result<DataValue> {
-    Ok(match &args[0] {
-        DataValue::Str(s) => DataValue::Str(fast2s::convert(s).into()),
-        d => d.clone(),
-    })
-}
-
 define_op!(OP_IS_NULL, 1, false);
 pub(crate) fn op_is_null(args: &[DataValue]) -> Result<DataValue> {
     Ok(DataValue::from(matches!(args[0], DataValue::Null)))

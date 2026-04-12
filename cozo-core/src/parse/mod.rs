@@ -32,7 +32,6 @@ use crate::parse::sys::{parse_sys, SysOp};
 use crate::{Expr, FixedRule};
 
 pub(crate) mod expr;
-pub(crate) mod fts;
 pub(crate) mod imperative;
 pub(crate) mod query;
 pub(crate) mod schema;
@@ -178,20 +177,6 @@ impl ImperativeStmt {
                     collector.insert(SmartString::from(format!("{}:{}", symb.name, subs.name)));
                 }
                 SysOp::CreateVectorIndex(m) => {
-                    collector.insert(m.base_relation.clone());
-                    collector.insert(SmartString::from(format!(
-                        "{}:{}",
-                        m.base_relation, m.index_name
-                    )));
-                }
-                SysOp::CreateFtsIndex(m) => {
-                    collector.insert(m.base_relation.clone());
-                    collector.insert(SmartString::from(format!(
-                        "{}:{}",
-                        m.base_relation, m.index_name
-                    )));
-                }
-                SysOp::CreateMinHashLshIndex(m) => {
                     collector.insert(m.base_relation.clone());
                     collector.insert(SmartString::from(format!(
                         "{}:{}",

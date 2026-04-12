@@ -14,7 +14,6 @@ use miette::{bail, Result};
 
 use crate::data::tuple::TupleT;
 use crate::data::value::DataValue;
-use crate::fts::TokenizerCache;
 use crate::runtime::callback::CallbackCollector;
 use crate::runtime::relation::RelationId;
 use crate::storage::temp::TempTx;
@@ -26,7 +25,6 @@ pub struct SessionTx<'a> {
     pub(crate) temp_store_tx: TempTx,
     pub(crate) relation_store_id: Arc<AtomicU64>,
     pub(crate) temp_store_id: AtomicU32,
-    pub(crate) tokenizers: Arc<TokenizerCache>,
 }
 
 pub const CURRENT_STORAGE_VERSION: [u8; 1] = [0x00];

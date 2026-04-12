@@ -19,7 +19,6 @@ use crate::data::expr::Expr;
 use crate::data::symb::Symbol;
 use crate::data::value::DataValue;
 use crate::fixed_rule::FixedRulePayload;
-use crate::fts::{TokenizerCache, TokenizerConfig};
 use crate::parse::SourceSpan;
 use crate::runtime::callback::CallbackOp;
 use crate::runtime::db::Poison;
@@ -688,109 +687,6 @@ fn test_vec_index() {
         println!("{} {} {}", row[0], row[1], row[2]);
     }
 }
-
-#[test]
-fn test_fts_indexing() {
-    let db = new_cozo_mem().unwrap();
-    db.run_default(r":create a {k: String => v: String}")
-        .unwrap();
-    db.run_default(
-        r"?[k, v] <- [['a', 'hello world!'], ['b', 'the world is round']] :put a {k => v}",
-    )
-    .unwrap();
-    db.run_default(
-        r"::fts create a:fts {
-            extractor: v,
-            tokenizer: Simple,
-            filters: [Lowercase, Stemmer('English'), Stopwords('en')]
-        }",
-    )
-    .unwrap();
-    db.run_default(
-        r"?[k, v] <- [
-            ['b', 'the world is square!'],
-            ['c', 'see you at the end of the world!'],
-            ['d', 'the world is the world and makes the world go around']
-        ] :put a {k => v}",
-    )
-    .unwrap();
-    let res = db
-        .run_default(
-            r"
-        ?[word, src_k, offset_from, offset_to, position, total_length] :=
-            *a:fts{word, src_k, offset_from, offset_to, position, total_length}
-        ",
-        )
-        .unwrap();
-    for row in res.into_json()["rows"].as_array().unwrap() {
-        println!("{}", row);
-    }
-    println!("query");
-    let res = db
-        .run_default(r"?[k, v, s] := ~a:fts{k, v | query: 'world', k: 2, bind_score: s}")
-        .unwrap();
-    for row in res.into_json()["rows"].as_array().unwrap() {
-        println!("{}", row);
-    }
-}
-
-#[test]
-fn test_lsh_indexing2() {
-    for i in 1..10 {
-        let f = i as f64 / 10.;
-        let db = new_cozo_mem().unwrap();
-        db.run_default(r":create a {k: String => v: String}")
-            .unwrap();
-        db.run_script(
-            r"::lsh create a:lsh {extractor: v, tokenizer: NGram, n_gram: 3, target_threshold: $t }",
-            BTreeMap::from([("t".into(), f.into())]),
-            ScriptMutability::Mutable
-        )
-            .unwrap();
-        db.run_default("?[k, v] <- [['a', 'ewiygfspeoighjsfcfxzdfncalsdf']] :put a {k => v}")
-            .unwrap();
-        let res = db
-            .run_default("?[k] := ~a:lsh{k | query: 'ewiygfspeoighjsfcfxzdfncalsdf', k: 1}")
-            .unwrap();
-        assert!(res.rows.len() > 0);
-    }
-}
-
-#[test]
-fn test_lsh_indexing3() {
-    for i in 1..10 {
-        let f = i as f64 / 10.;
-        let db = new_cozo_mem().unwrap();
-        db.run_default(r":create text {id: String,  => text: String, url: String? default null, dt: Float default now(), dup_for: String? default null }")
-            .unwrap();
-        db.run_script(
-            r"::lsh create text:lsh {
-                    extractor: text,
-                    # extract_filter: is_null(dup_for),
-                    tokenizer: NGram,
-                    n_perm: 200,
-                    target_threshold: $t,
-                    n_gram: 7,
-                }",
-            BTreeMap::from([("t".into(), f.into())]),
-            ScriptMutability::Mutable,
-        )
-        .unwrap();
-        db.run_default(
-            "?[id, text] <- [['a', 'This function first generates 32 random bytes using the os.urandom function. It then base64 encodes these bytes using base64.urlsafe_b64encode, removes the padding, and decodes the result to a string.']] :put text {id, text}",
-        )
-        .unwrap();
-        let res = db
-            .run_default(
-                r#"?[id, dup_for] :=
-    ~text:lsh{id: id, dup_for: dup_for, | query: "This function first generates 32 random bytes using the os.urandom function. It then base64 encodes these bytes using base64.urlsafe_b64encode, removes the padding, and decodes the result to a string.", }"#,
-            )
-            .unwrap();
-        assert!(res.rows.len() > 0);
-        println!("{}", res.into_json());
-    }
-}
-
 #[test]
 fn filtering() {
     let db = new_cozo_mem().unwrap();
@@ -826,97 +722,6 @@ fn filtering() {
         .unwrap();
     assert_eq!(0, res.rows.len());
 }
-
-#[test]
-fn test_lsh_indexing4() {
-    for i in 1..10 {
-        let f = i as f64 / 10.;
-        let db = new_cozo_mem().unwrap();
-        db.run_default(r":create a {k: String => v: String}")
-            .unwrap();
-        db.run_script(
-            r"::lsh create a:lsh {extractor: v, tokenizer: NGram, n_gram: 3, target_threshold: $t }",
-            BTreeMap::from([("t".into(), f.into())]),
-            ScriptMutability::Mutable
-        )
-            .unwrap();
-        db.run_default("?[k, v] <- [['a', 'ewiygfspeoighjsfcfxzdfncalsdf']] :put a {k => v}")
-            .unwrap();
-        db.run_default("?[k] <- [['a']] :rm a {k}").unwrap();
-        let res = db
-            .run_default("?[k] := ~a:lsh{k | query: 'ewiygfspeoighjsfcfxzdfncalsdf', k: 1}")
-            .unwrap();
-        assert!(res.rows.len() == 0);
-    }
-}
-
-#[test]
-fn test_lsh_indexing() {
-    let db = new_cozo_mem().unwrap();
-    db.run_default(r":create a {k: String => v: String}")
-        .unwrap();
-    db.run_default(
-        r"?[k, v] <- [['a', 'hello world!'], ['b', 'the world is round']] :put a {k => v}",
-    )
-    .unwrap();
-    db.run_default(
-        r"::lsh create a:lsh {extractor: v, tokenizer: Simple, n_gram: 3, target_threshold: 0.3 }",
-    )
-    .unwrap();
-    db.run_default(
-        r"?[k, v] <- [
-            ['b', 'the world is square!'],
-            ['c', 'see you at the end of the world!'],
-            ['d', 'the world is the world and makes the world go around'],
-            ['e', 'the world is the world and makes the world not go around']
-        ] :put a {k => v}",
-    )
-    .unwrap();
-    let res = db.run_default("::columns a:lsh").unwrap();
-    for row in res.into_json()["rows"].as_array().unwrap() {
-        println!("{}", row);
-    }
-    let _res = db
-        .run_default(
-            r"
-        ?[src_k, hash] :=
-            *a:lsh{src_k, hash}
-        ",
-        )
-        .unwrap();
-    // for row in _res.into_json()["rows"].as_array().unwrap() {
-    //     println!("{}", row);
-    // }
-    let _res = db
-        .run_default(
-            r"
-        ?[k, minhash] :=
-            *a:lsh:inv{k, minhash}
-        ",
-        )
-        .unwrap();
-    // for row in res.into_json()["rows"].as_array().unwrap() {
-    //     println!("{}", row);
-    // }
-    let res = db
-        .run_default(
-            r"
-            ?[k, v] := ~a:lsh{k, v |
-                query: 'see him at the end of the world',
-            }
-            ",
-        )
-        .unwrap();
-    for row in res.into_json()["rows"].as_array().unwrap() {
-        println!("{}", row);
-    }
-    let res = db.run_default("::indices a").unwrap();
-    for row in res.into_json()["rows"].as_array().unwrap() {
-        println!("{}", row);
-    }
-    db.run_default(r"::lsh drop a:lsh").unwrap();
-}
-
 #[test]
 fn test_insertions() {
     let db = new_cozo_mem().unwrap();
@@ -945,49 +750,6 @@ fn test_insertions() {
         println!("{} {}", row[0], row[1]);
     }
 }
-
-#[test]
-fn tokenizers() {
-    let tokenizers = TokenizerCache::default();
-    let tokenizer = tokenizers
-        .get(
-            "simple",
-            &TokenizerConfig {
-                name: "Simple".into(),
-                args: vec![],
-            },
-            &[],
-        )
-        .unwrap();
-
-    // let tokenizer = TextAnalyzer::from(SimpleTokenizer)
-    //     .filter(RemoveLongFilter::limit(40))
-    //     .filter(LowerCaser)
-    //     .filter(Stemmer::new(Language::English));
-    let mut token_stream = tokenizer.token_stream("It is closer to Apache Lucene than to Elasticsearch or Apache Solr in the sense it is not an off-the-shelf search engine server, but rather a crate that can be used to build such a search engine.");
-    while let Some(token) = token_stream.next() {
-        println!("Token {:?}", token.text);
-    }
-
-    println!("XXXXXXXXXXXXX");
-
-    let tokenizer = tokenizers
-        .get(
-            "cangjie",
-            &TokenizerConfig {
-                name: "Cangjie".into(),
-                args: vec![],
-            },
-            &[],
-        )
-        .unwrap();
-
-    let mut token_stream = tokenizer.token_stream("这个产品Finchat.io是一个相对比较有特色的文档问答类网站，它集成了750多家公司的经融数据。感觉是把财报等数据借助Embedding都向量化了，然后接入ChatGPT进行对话。");
-    while let Some(token) = token_stream.next() {
-        println!("Token {:?}", token.text);
-    }
-}
-
 #[test]
 fn multi_index_vec() {
     let db = new_cozo_mem().unwrap();
@@ -1245,70 +1007,6 @@ fn update_shall_work() {
     let r = db.run_default(r"?[x, y, z] := *z {x, y, z}").unwrap();
     assert_eq!(r.into_json()["rows"], json!([[1, 4, 3]]));
 }
-
-#[test]
-fn sysop_in_imperatives() {
-    let script = r#"
-    {
-            :create cm_src {
-                aid: String =>
-                title: String,
-                author: String?,
-                kind: String,
-                url: String,
-                domain: String?,
-                pub_time: Float?,
-                dt: Float default now(),
-                weight: Float default 1,
-            }
-        }
-        {
-            :create cm_txt {
-                tid: String =>
-                aid: String,
-                tag: String,
-                follows_tid: String?,
-                dup_for: String?,
-                text: String,
-                info_amount: Int,
-            }
-        }
-        {
-            :create cm_seg {
-                sid: String =>
-                tid: String,
-                tag: String,
-                part: Int,
-                text: String,
-                vec: <F32; 1536>,
-            }
-        }
-        {
-            ::hnsw create cm_seg:vec {
-                dim: 1536,
-                m: 50,
-                dtype: F32,
-                fields: vec,
-                distance: Cosine,
-                ef: 100,
-            }
-        }
-        {
-            ::lsh create cm_txt:lsh {
-                extractor: text,
-                extract_filter: is_null(dup_for),
-                tokenizer: NGram,
-                n_perm: 200,
-                target_threshold: 0.5,
-                n_gram: 7,
-            }
-        }
-        {::relations}
-    "#;
-    let db = new_cozo_mem().unwrap();
-    db.run_default(script).unwrap();
-}
-
 #[test]
 fn bad_parse() {
     let db = new_cozo_mem().unwrap();
@@ -1467,29 +1165,4 @@ fn hnsw_index() {
             :order dist
     "#).unwrap();
     println!("{}", res.into_json()["rows"][0][4]);
-}
-
-#[test]
-fn fts_drop() {
-    let db = new_cozo_mem().unwrap();
-    db.run_default(
-        r#"
-            :create entity {name}
-        "#,
-    )
-    .unwrap();
-    db.run_default(
-        r#"
-        ::fts create entity:fts_index { extractor: name,
-            tokenizer: Simple, filters: [Lowercase]
-        }
-    "#,
-    )
-    .unwrap();
-    db.run_default(
-        r#"
-        ::fts drop entity:fts_index
-    "#,
-    )
-    .unwrap();
 }

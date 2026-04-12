@@ -10,7 +10,6 @@ pub(crate) mod callback;
 pub(crate) mod db;
 pub(crate) mod hnsw;
 pub(crate) mod imperative;
-pub(crate) mod minhash_lsh;
 pub(crate) mod relation;
 pub(crate) mod temp_store;
 #[cfg(test)]

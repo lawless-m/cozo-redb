@@ -24,13 +24,11 @@ use crate::data::relation::{ColType, ColumnDef, NullableColType, StoredRelationM
 use crate::data::symb::Symbol;
 use crate::data::tuple::{decode_tuple_from_key, Tuple, TupleT, ENCODED_KEY_MIN_LEN};
 use crate::data::value::{DataValue, ValidityTs};
-use crate::fts::FtsIndexManifest;
 use crate::parse::expr::build_expr;
-use crate::parse::sys::{FtsIndexConfig, HnswIndexConfig, MinHashLshConfig};
+use crate::parse::sys::HnswIndexConfig;
 use crate::parse::{CozoScriptParser, Rule, SourceSpan};
 use crate::query::compile::IndexPositionUse;
 use crate::runtime::hnsw::HnswIndexManifest;
-use crate::runtime::minhash_lsh::{HashPermutations, LshParams, MinHashLshIndexManifest, Weights};
 use crate::runtime::transact::SessionTx;
 use crate::utils::TempCollector;
 use crate::{NamedRows, StoreTx};
@@ -84,26 +82,15 @@ pub(crate) struct RelationHandle {
     pub(crate) indices: BTreeMap<SmartString<LazyCompact>, (RelationHandle, Vec<usize>)>,
     pub(crate) hnsw_indices:
         BTreeMap<SmartString<LazyCompact>, (RelationHandle, HnswIndexManifest)>,
-    pub(crate) fts_indices: BTreeMap<SmartString<LazyCompact>, (RelationHandle, FtsIndexManifest)>,
-    pub(crate) lsh_indices: BTreeMap<
-        SmartString<LazyCompact>,
-        (RelationHandle, RelationHandle, MinHashLshIndexManifest),
-    >,
     pub(crate) description: SmartString<LazyCompact>,
 }
 
 impl RelationHandle {
     pub(crate) fn has_index(&self, index_name: &str) -> bool {
-        self.indices.contains_key(index_name)
-            || self.hnsw_indices.contains_key(index_name)
-            || self.fts_indices.contains_key(index_name)
-            || self.lsh_indices.contains_key(index_name)
+        self.indices.contains_key(index_name) || self.hnsw_indices.contains_key(index_name)
     }
     pub(crate) fn has_no_index(&self) -> bool {
-        self.indices.is_empty()
-            && self.hnsw_indices.is_empty()
-            && self.fts_indices.is_empty()
-            && self.lsh_indices.is_empty()
+        self.indices.is_empty() && self.hnsw_indices.is_empty()
     }
 }
 
@@ -617,8 +604,6 @@ impl<'a> SessionTx<'a> {
             is_temp,
             indices: Default::default(),
             hnsw_indices: Default::default(),
-            fts_indices: Default::default(),
-            lsh_indices: Default::default(),
             description: Default::default(),
         };
 
@@ -735,278 +720,6 @@ impl<'a> SessionTx<'a> {
 
         Ok(())
     }
-
-    pub(crate) fn create_minhash_lsh_index(&mut self, config: &MinHashLshConfig) -> Result<()> {
-        // Get relation handle
-        let mut rel_handle = self.get_relation(&config.base_relation, true)?;
-
-        // Check if index already exists
-        if rel_handle.has_index(&config.index_name) {
-            bail!(IndexAlreadyExists(
-                config.index_name.to_string(),
-                config.index_name.to_string()
-            ));
-        }
-
-        let inv_idx_keys = rel_handle.metadata.keys.clone();
-        let inv_idx_vals = vec![ColumnDef {
-            name: SmartString::from("minhash"),
-            typing: NullableColType {
-                coltype: ColType::Bytes,
-                nullable: false,
-            },
-            default_gen: None,
-        }];
-
-        let mut idx_keys = vec![ColumnDef {
-            name: SmartString::from("hash"),
-            typing: NullableColType {
-                coltype: ColType::Bytes,
-                nullable: false,
-            },
-            default_gen: None,
-        }];
-        for k in rel_handle.metadata.keys.iter() {
-            idx_keys.push(ColumnDef {
-                name: format!("src_{}", k.name).into(),
-                typing: k.typing.clone(),
-                default_gen: None,
-            });
-        }
-        let idx_vals = vec![];
-
-        let idx_handle = self.write_idx_relation(
-            &config.base_relation,
-            &config.index_name,
-            idx_keys,
-            idx_vals,
-        )?;
-
-        let inv_idx_handle = self.write_idx_relation(
-            &config.base_relation,
-            &format!("{}:inv", config.index_name),
-            inv_idx_keys,
-            inv_idx_vals,
-        )?;
-
-        // add index to relation
-        let params = LshParams::find_optimal_params(
-            config.target_threshold.0,
-            config.n_perm,
-            &Weights(
-                config.false_positive_weight.0,
-                config.false_negative_weight.0,
-            ),
-        );
-        let num_perm = params.b * params.r;
-        let perms = HashPermutations::new(num_perm);
-        let manifest = MinHashLshIndexManifest {
-            base_relation: config.base_relation.clone(),
-            index_name: config.index_name.clone(),
-            extractor: config.extractor.clone(),
-            n_gram: config.n_gram,
-            tokenizer: config.tokenizer.clone(),
-            filters: config.filters.clone(),
-            num_perm,
-            n_bands: params.b,
-            n_rows_in_band: params.r,
-            threshold: config.target_threshold.0,
-            perms: perms.as_bytes().to_vec(),
-        };
-
-        // populate index
-        let tokenizer =
-            self.tokenizers
-                .get(&idx_handle.name, &manifest.tokenizer, &manifest.filters)?;
-        let parsed = CozoScriptParser::parse(Rule::expr, &manifest.extractor)
-            .into_diagnostic()?
-            .next()
-            .unwrap();
-        let mut code_expr = build_expr(parsed, &Default::default())?;
-        let binding_map = rel_handle.raw_binding_map();
-        code_expr.fill_binding_indices(&binding_map)?;
-        let extractor = code_expr.compile()?;
-
-        let mut stack = vec![];
-
-        let hash_perms = manifest.get_hash_perms();
-        let mut existing = TempCollector::default();
-        for tuple in rel_handle.scan_all(self) {
-            existing.push(tuple?);
-        }
-
-        for tuple in existing.into_iter() {
-            self.put_lsh_index_item(
-                &tuple,
-                &extractor,
-                &mut stack,
-                &tokenizer,
-                &rel_handle,
-                &idx_handle,
-                &inv_idx_handle,
-                &manifest,
-                &hash_perms,
-            )?;
-        }
-
-        rel_handle.lsh_indices.insert(
-            manifest.index_name.clone(),
-            (idx_handle, inv_idx_handle, manifest),
-        );
-
-        // update relation metadata
-        let new_encoded =
-            vec![DataValue::from(&rel_handle.name as &str)].encode_as_key(RelationId::SYSTEM);
-        let mut meta_val = vec![];
-        rel_handle
-            .serialize(&mut Serializer::new(&mut meta_val))
-            .unwrap();
-        self.store_tx.put(&new_encoded, &meta_val)?;
-
-        Ok(())
-    }
-
-    pub(crate) fn create_fts_index(&mut self, config: &FtsIndexConfig) -> Result<()> {
-        // Get relation handle
-        let mut rel_handle = self.get_relation(&config.base_relation, true)?;
-
-        // Check if index already exists
-        if rel_handle.has_index(&config.index_name) {
-            bail!(IndexAlreadyExists(
-                config.index_name.to_string(),
-                config.index_name.to_string()
-            ));
-        }
-
-        // Build key columns definitions
-        let mut idx_keys: Vec<ColumnDef> = vec![ColumnDef {
-            name: SmartString::from("word"),
-            typing: NullableColType {
-                coltype: ColType::String,
-                nullable: false,
-            },
-            default_gen: None,
-        }];
-
-        for k in rel_handle.metadata.keys.iter() {
-            idx_keys.push(ColumnDef {
-                name: format!("src_{}", k.name).into(),
-                typing: k.typing.clone(),
-                default_gen: None,
-            });
-        }
-
-        let col_type = NullableColType {
-            coltype: ColType::List {
-                eltype: Box::new(NullableColType {
-                    coltype: ColType::Int,
-                    nullable: false,
-                }),
-                len: None,
-            },
-            nullable: false,
-        };
-
-        let non_idx_keys: Vec<ColumnDef> = vec![
-            ColumnDef {
-                name: SmartString::from("offset_from"),
-                typing: col_type.clone(),
-                default_gen: None,
-            },
-            ColumnDef {
-                name: SmartString::from("offset_to"),
-                typing: col_type.clone(),
-                default_gen: None,
-            },
-            ColumnDef {
-                name: SmartString::from("position"),
-                typing: col_type,
-                default_gen: None,
-            },
-            ColumnDef {
-                name: SmartString::from("total_length"),
-                typing: NullableColType {
-                    coltype: ColType::Int,
-                    nullable: false,
-                },
-                default_gen: None,
-            },
-        ];
-
-        let idx_handle = self.write_idx_relation(
-            &config.base_relation,
-            &config.index_name,
-            idx_keys,
-            non_idx_keys,
-        )?;
-
-        // add index to relation
-        let manifest = FtsIndexManifest {
-            base_relation: config.base_relation.clone(),
-            index_name: config.index_name.clone(),
-            extractor: config.extractor.clone(),
-            tokenizer: config.tokenizer.clone(),
-            filters: config.filters.clone(),
-        };
-
-        // populate index
-        let tokenizer =
-            self.tokenizers
-                .get(&idx_handle.name, &manifest.tokenizer, &manifest.filters)?;
-
-        let parsed = CozoScriptParser::parse(Rule::expr, &manifest.extractor)
-            .into_diagnostic()?
-            .next()
-            .unwrap();
-        let mut code_expr = build_expr(parsed, &Default::default())?;
-        let binding_map = rel_handle.raw_binding_map();
-        code_expr.fill_binding_indices(&binding_map)?;
-        let extractor = code_expr.compile()?;
-
-        let mut stack = vec![];
-
-        let mut existing = TempCollector::default();
-        for tuple in rel_handle.scan_all(self) {
-            existing.push(tuple?);
-        }
-        for tuple in existing.into_iter() {
-            let key_part = &tuple[..rel_handle.metadata.keys.len()];
-            if rel_handle.exists(self, key_part)? {
-                self.del_fts_index_item(
-                    &tuple,
-                    &extractor,
-                    &mut stack,
-                    &tokenizer,
-                    &rel_handle,
-                    &idx_handle,
-                )?;
-            }
-            self.put_fts_index_item(
-                &tuple,
-                &extractor,
-                &mut stack,
-                &tokenizer,
-                &rel_handle,
-                &idx_handle,
-            )?;
-        }
-
-        rel_handle
-            .fts_indices
-            .insert(manifest.index_name.clone(), (idx_handle, manifest));
-
-        // update relation metadata
-        let new_encoded =
-            vec![DataValue::from(&rel_handle.name as &str)].encode_as_key(RelationId::SYSTEM);
-        let mut meta_val = vec![];
-        rel_handle
-            .serialize(&mut Serializer::new(&mut meta_val))
-            .unwrap();
-        self.store_tx.put(&new_encoded, &meta_val)?;
-
-        Ok(())
-    }
-
     pub(crate) fn create_hnsw_index(&mut self, config: &HnswIndexConfig) -> Result<()> {
         // Get relation handle
         let mut rel_handle = self.get_relation(&config.base_relation, true)?;
@@ -1361,16 +1074,8 @@ impl<'a> SessionTx<'a> {
         idx_name: &Symbol,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
         let mut rel = self.get_relation(rel_name, true)?;
-        let is_lsh = rel.lsh_indices.contains_key(&idx_name.name);
-        let is_fts = rel.fts_indices.contains_key(&idx_name.name);
-        if is_lsh || is_fts {
-            self.tokenizers.named_cache.write().unwrap().clear();
-            self.tokenizers.hashed_cache.write().unwrap().clear();
-        }
         if rel.indices.remove(&idx_name.name).is_none()
             && rel.hnsw_indices.remove(&idx_name.name).is_none()
-            && rel.lsh_indices.remove(&idx_name.name).is_none()
-            && rel.fts_indices.remove(&idx_name.name).is_none()
         {
             #[derive(Debug, Error, Diagnostic)]
             #[error("index {0} for relation {1} not found")]
@@ -1380,13 +1085,7 @@ impl<'a> SessionTx<'a> {
             bail!(IndexNotFound(idx_name.to_string(), rel_name.to_string()));
         }
 
-        let mut to_clean =
-            self.destroy_relation(&format!("{}:{}", rel_name.name, idx_name.name))?;
-        if is_lsh {
-            to_clean.extend(
-                self.destroy_relation(&format!("{}:{}:inv", rel_name.name, idx_name.name))?,
-            );
-        }
+        let to_clean = self.destroy_relation(&format!("{}:{}", rel_name.name, idx_name.name))?;
 
         let new_encoded =
             vec![DataValue::from(&rel_name.name as &str)].encode_as_key(RelationId::SYSTEM);
