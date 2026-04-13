@@ -114,10 +114,11 @@ pub(crate) struct FtsIndexRuntime {
 impl FtsIndexRuntime {
     /// Build (or reopen) a tantivy index at the given directory, with a
     /// schema derived from the manifest's declared field names. Called once
-    /// per manifest per database open.
+    /// per manifest per database open. When compiled without `fts-mmap`
+    /// (e.g. the WASM build) the directory argument is ignored and the
+    /// index is held entirely in RAM — each database open starts with an
+    /// empty FTS index that must be repopulated.
     pub(crate) fn open_or_create(manifest: &FtsIndexManifest, dir: &Path) -> Result<Self> {
-        std::fs::create_dir_all(dir).into_diagnostic()?;
-
         let mut builder = Schema::builder();
         builder.add_text_field(KEY_FIELD, STRING | STORED);
         for name in &manifest.fields {
@@ -125,13 +126,22 @@ impl FtsIndexRuntime {
         }
         let schema = builder.build();
 
-        // Try to open an existing index first; fall back to creating a new
-        // one with the current schema. A schema mismatch on reopen will
-        // cause tantivy to error; the user should drop and recreate the
-        // index in that case.
-        let index = match Index::open_in_dir(dir) {
-            Ok(existing) => existing,
-            Err(_) => Index::create_in_dir(dir, schema.clone()).into_diagnostic()?,
+        #[cfg(feature = "fts-mmap")]
+        let index = {
+            std::fs::create_dir_all(dir).into_diagnostic()?;
+            // Try to open an existing index first; fall back to creating a
+            // new one with the current schema. A schema mismatch on reopen
+            // causes tantivy to error; the user must drop and recreate the
+            // index in that case.
+            match Index::open_in_dir(dir) {
+                Ok(existing) => existing,
+                Err(_) => Index::create_in_dir(dir, schema.clone()).into_diagnostic()?,
+            }
+        };
+        #[cfg(not(feature = "fts-mmap"))]
+        let index = {
+            let _ = dir;
+            Index::create_in_ram(schema.clone())
         };
 
         let writer: IndexWriter = index.writer(WRITER_HEAP_BUDGET).into_diagnostic()?;
@@ -294,10 +304,15 @@ impl FtsIndexCache {
             index_name: key.1,
             fields: vec![],
         };
-        let dir = manifest.index_path(db_path);
-        if dir.exists() {
-            std::fs::remove_dir_all(&dir).into_diagnostic()?;
+        #[cfg(feature = "fts-mmap")]
+        {
+            let dir = manifest.index_path(db_path);
+            if dir.exists() {
+                std::fs::remove_dir_all(&dir).into_diagnostic()?;
+            }
         }
+        #[cfg(not(feature = "fts-mmap"))]
+        let _ = (manifest, db_path);
         Ok(())
     }
 }
