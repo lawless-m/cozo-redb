@@ -5,35 +5,14 @@
 
 > **A Rust graph database backed by [redb](https://github.com/cberner/redb).**
 >
-> `cozo-redb` is an aggressive fork of [cozodb/cozo](https://github.com/cozodb/cozo) —
-> Ziyang Hu's transactional Datalog database, which has been dormant since December 2024.
-> This fork picks **redb** (a pure-Rust mmap B-tree) as its single persistent backend and
-> deletes everything else. The query language, Datalog semantics, time-travel relations,
-> and HNSW vector search are inherited unchanged from upstream; the full-text index has
-> been modified, and MinHash-LSH has been removed entirely. The
-> [upstream documentation](https://docs.cozodb.org/) and its mirrors (readthedocs, docs.rs
-> for upstream crates) still describe much of how queries work here, though they are no
-> longer perfectly in step with this fork.
+> `cozo-redb` is a Rust-first fork of [cozodb/cozo](https://github.com/cozodb/cozo) —
+> Ziyang Hu's transactional Datalog database. It keeps the query language, Datalog
+> semantics, time-travel relations, and HNSW vector search, and uses **redb**
+> (a pure-Rust mmap B-tree) as its single persistent backend.
 >
-> This is not a takeover bid or a bid for the upstream name. It's a personal maintenance
-> furrow with a specific angle: **redb is the interesting backend upstream never shipped,
-> and we want a tight Rust-first graph database to use.**
->
-> In one long day this fork was stripped of:
->
-> * the `cozorocks` C++ FFI subcrate and its 42 MB vendored `librocksdb` submodule;
-> * the `sled`, `tikv`, `sqlite`, and `rocksdb` storage backends;
-> * the `backup_db` / `restore_backup` / `import_from_backup` API surface (since it
->   was sqlite-coupled — to back up a redb database, close it and copy the file);
-> * the Python, Node, Java, Swift, and C language bindings (upstream v0.7 still has
->   them if you need them).
->
-> What was added: a pure-Rust `redb` storage backend with time travel, benchmark
-> infrastructure that actually runs, and a CI pipeline covering build / cross-platform /
-> docs / fmt / clippy / audit / dependabot.
->
-> Remaining backends: **`mem`** (in-process, non-persistent) and **`redb`** (pure-Rust
-> mmap B-tree, persistent, ACID, supports time travel). That's it.
+> This fork ships only the `mem` and `redb` backends; rocksdb, sled, sqlite, tikv, and
+> the non-Rust language bindings are gone. For other notes, see
+> [DIFFERENCES.md](DIFFERENCES.md).
 >
 > No support commitment, no release cadence promise. MPL-2.0, PRs welcome.
 
@@ -71,10 +50,6 @@ A Rust crate that runs in your program's process. No server, no socket,
 no daemon, no port to open. Add `cozo` to your `Cargo.toml`, call it
 from your code, ship one binary.
 
-Upstream CozoDB once offered a client-server mode via an HTTP server.
-This fork does not. If you need a client-server graph database,
-`cozo-redb` is not for you.
-
 ### Why graphs
 
 Most interesting questions about data are questions about relationships:
@@ -83,10 +58,6 @@ SQL can express them, but recursive traversals are awkward and slow.
 `cozo-redb` stores data in ordinary relations and queries them with
 Datalog, which handles recursion natively — shortest-path, reachability,
 and PageRank are one query, not twenty.
-
-This is **not** a labelled-property graph database. There are no
-nodes-and-edges primitives. Model your data as relations; the graph is
-whatever the relations describe.
 
 ### Why Datalog
 
@@ -224,16 +195,6 @@ This fork targets Rust embedders.
 * **WebAssembly** (`cozo-lib-wasm/`): in-browser build. Currently being rebuilt; don't
   rely on it.
 
-### Backup and restore
-
-There is no in-process `backup_db` / `restore_backup` API. To back up a redb database,
-close it and copy the `.redb` file with your usual backup tool (`cp`, `rsync`, `restic`, etc).
-To restore, copy the file back. This is a deliberate simplification — redb is a single
-file and "copy the file" is a perfectly good backup strategy.
-
-(The old upstream backup mechanism relied on sqlite as an intermediate format;
-when sqlite was dropped from this fork, the backup API went with it.)
-
 ## Architecture
 
 CozoDB consists of three layers stuck on top of each other,
@@ -268,14 +229,11 @@ original upstream [execution docs](https://docs.cozodb.org/en/latest/execution.h
 ## Status of the project
 
 `cozo-redb` exists so I have a tight, pure-Rust graph database in my personal toolkit.
-It is not a community takeover bid, not a claim on the CozoDB name, and makes no
-promise of support, release cadence, or stability for anyone else. Pick it up if the
-specific shape of "redb + Datalog + time travel + vector search, nothing else" is
-what you need.
-
 MPL-2.0, PRs and issues welcome if you are using it.
 
 Versions before 1.0 do not promise syntax/API stability or storage compatibility.
+For the fork's scope and what has been trimmed from upstream, see
+[DIFFERENCES.md](DIFFERENCES.md).
 
 ## Links
 
