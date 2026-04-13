@@ -39,10 +39,7 @@ pub fn new_cozo_redb_mem() -> Result<crate::Db<RedbStorage>> {
     finish_redb(db, std::path::PathBuf::new())
 }
 
-fn finish_redb(
-    db: Database,
-    path_buf: std::path::PathBuf,
-) -> Result<crate::Db<RedbStorage>> {
+fn finish_redb(db: Database, path_buf: std::path::PathBuf) -> Result<crate::Db<RedbStorage>> {
     {
         let tx = db.begin_write().into_diagnostic()?;
         tx.open_table(TABLE).into_diagnostic()?;
@@ -470,14 +467,8 @@ mod tests {
         assert!(ids.contains(&1));
         assert!(ids.contains(&3));
 
-        run(
-            &db,
-            r#"?[id] <- [[1]] :rm notes {id}"#,
-        )?;
-        let hits = run(
-            &db,
-            r#"?[id] := ~notes:ft{id | query: "rust", k: 10}"#,
-        )?;
+        run(&db, r#"?[id] <- [[1]] :rm notes {id}"#)?;
+        let hits = run(&db, r#"?[id] := ~notes:ft{id | query: "rust", k: 10}"#)?;
         assert_eq!(hits.rows.len(), 1);
         assert_eq!(hits.rows[0][0], DataValue::from(3));
 
@@ -486,10 +477,7 @@ mod tests {
             r#"?[id, title, body] <- [[2, 'python graph notes', 'rustacean content']]
                :put notes {id => title, body}"#,
         )?;
-        let hits = run(
-            &db,
-            r#"?[id] := ~notes:ft{id | query: "rustacean", k: 10}"#,
-        )?;
+        let hits = run(&db, r#"?[id] := ~notes:ft{id | query: "rustacean", k: 10}"#)?;
         assert_eq!(hits.rows.len(), 1);
         assert_eq!(hits.rows[0][0], DataValue::from(2));
 

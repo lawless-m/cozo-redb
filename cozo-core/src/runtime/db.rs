@@ -183,11 +183,7 @@ impl NamedRows {
     }
     /// Create a query and parameters to apply an operation (insert, put, delete, rm) to a stored
     /// relation with the named rows.
-    pub fn into_payload(
-        self,
-        relation: &str,
-        op: &str,
-    ) -> (String, BTreeMap<String, DataValue>) {
+    pub fn into_payload(self, relation: &str, op: &str) -> (String, BTreeMap<String, DataValue>) {
         let cols_str = self.headers.join(", ");
         let query = format!("?[{cols_str}] <- $data :{op} {relation} {{ {cols_str} }}");
         let data = DataValue::List(self.rows.into_iter().map(|r| DataValue::List(r)).collect());
@@ -548,8 +544,7 @@ impl<'s, S: Storage<'s>> Db<S> {
     ) -> Result<NamedRows> {
         #[allow(unused_variables)]
         let sleep_opt = p.out_opts.sleep;
-        let (q_res, q_cleanups) =
-            self.run_query(tx, p, cur_vld, callback_collector, true)?;
+        let (q_res, q_cleanups) = self.run_query(tx, p, cur_vld, callback_collector, true)?;
         cleanups.extend(q_cleanups);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(secs) = sleep_opt {

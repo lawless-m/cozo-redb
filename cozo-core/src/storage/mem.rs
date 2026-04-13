@@ -241,7 +241,6 @@ impl<'s> StoreTx<'s> for MemTx<'s> {
             .count(),
         })
     }
-
 }
 
 struct CacheIterRaw<'a, C, T>

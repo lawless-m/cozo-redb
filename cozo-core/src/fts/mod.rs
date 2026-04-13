@@ -175,8 +175,7 @@ impl FtsIndexRuntime {
         }
         let writer = self.writer.lock().unwrap();
         writer.add_document(doc).into_diagnostic()?;
-        self.dirty
-            .store(true, std::sync::atomic::Ordering::Release);
+        self.dirty.store(true, std::sync::atomic::Ordering::Release);
         Ok(())
     }
 
@@ -187,8 +186,7 @@ impl FtsIndexRuntime {
         let writer = self.writer.lock().unwrap();
         let term = Term::from_field_text(self.key_field, &encode_key(key_bytes));
         writer.delete_term(term);
-        self.dirty
-            .store(true, std::sync::atomic::Ordering::Release);
+        self.dirty.store(true, std::sync::atomic::Ordering::Release);
         Ok(())
     }
 

@@ -68,11 +68,9 @@ pub(crate) mod runtime;
 pub(crate) mod storage;
 pub(crate) mod utils;
 
-
 impl<'s, S: Storage<'s>> Db<S> {
     /// Run `payload` with no parameters in mutable mode.
     pub fn run_default(&'s self, payload: &str) -> Result<NamedRows> {
         self.run_script(payload, BTreeMap::new(), ScriptMutability::Mutable)
     }
 }
-

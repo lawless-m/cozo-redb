@@ -770,8 +770,8 @@ impl<'a> SessionTx<'a> {
             existing.push(tuple?);
         }
         for tuple in existing.into_iter() {
-            let key_bytes = rel_handle
-                .encode_key_for_store(&tuple[..key_len], Default::default())?;
+            let key_bytes =
+                rel_handle.encode_key_for_store(&tuple[..key_len], Default::default())?;
             // Strip the 9-byte cozo relation-id prefix so the stored key
             // matches what runtime search paths will use to look up the row.
             let key_bytes = key_bytes[ENCODED_KEY_MIN_LEN..].to_vec();

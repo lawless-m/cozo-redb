@@ -332,9 +332,8 @@ pub(crate) fn parse_sys(
                     let mut inner = inner.into_inner();
                     let rel = inner.next().unwrap();
                     let name = inner.next().unwrap();
-                    let fields: Vec<SmartString<LazyCompact>> = inner
-                        .map(|p| SmartString::from(p.as_str()))
-                        .collect();
+                    let fields: Vec<SmartString<LazyCompact>> =
+                        inner.map(|p| SmartString::from(p.as_str())).collect();
                     if fields.is_empty() {
                         #[derive(Debug, miette::Diagnostic, thiserror::Error)]
                         #[error("`::fts create` requires at least one field")]

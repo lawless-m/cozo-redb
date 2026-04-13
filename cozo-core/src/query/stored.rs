@@ -84,13 +84,7 @@ impl<'a> SessionTx<'a> {
                     .get_single_program()?;
 
                     let (_, cleanups) = db
-                        .run_query(
-                            self,
-                            program,
-                            cur_vld,
-                            callback_collector,
-                            false,
-                        )
+                        .run_query(self, program, cur_vld, callback_collector, false)
                         .map_err(|err| {
                             if err.source_code().is_some() {
                                 err
@@ -210,8 +204,7 @@ impl<'a> SessionTx<'a> {
         force_collect: &str,
         span: SourceSpan,
     ) -> Result<()> {
-        let is_callback_target =
-            force_collect == relation_store.name;
+        let is_callback_target = force_collect == relation_store.name;
 
         if relation_store.access_level < AccessLevel::Protected {
             bail!(InsufficientAccessLevel(
@@ -411,11 +404,7 @@ impl<'a> SessionTx<'a> {
     }
 
     #[cfg(feature = "fts")]
-    fn delete_in_fts(
-        &self,
-        relation_store: &RelationHandle,
-        key_bytes: &[u8],
-    ) -> Result<()> {
+    fn delete_in_fts(&self, relation_store: &RelationHandle, key_bytes: &[u8]) -> Result<()> {
         if relation_store.fts_indices.is_empty() {
             return Ok(());
         }
@@ -462,8 +451,7 @@ impl<'a> SessionTx<'a> {
         force_collect: &str,
         span: SourceSpan,
     ) -> Result<()> {
-        let is_callback_target =
-            force_collect == relation_store.name;
+        let is_callback_target = force_collect == relation_store.name;
 
         if relation_store.access_level < AccessLevel::Protected {
             bail!(InsufficientAccessLevel(
@@ -634,13 +622,7 @@ impl<'a> SessionTx<'a> {
                 );
 
                 let (_, cleanups) = db
-                    .run_query(
-                        self,
-                        program,
-                        cur_vld,
-                        callback_collector,
-                        false,
-                    )
+                    .run_query(self, program, cur_vld, callback_collector, false)
                     .map_err(|err| {
                         if err.source_code().is_some() {
                             err
@@ -843,8 +825,7 @@ impl<'a> SessionTx<'a> {
         force_collect: &str,
         span: SourceSpan,
     ) -> Result<()> {
-        let is_callback_target =
-            force_collect == relation_store.name;
+        let is_callback_target = force_collect == relation_store.name;
 
         if relation_store.access_level < AccessLevel::Protected {
             bail!(InsufficientAccessLevel(
@@ -967,13 +948,7 @@ impl<'a> SessionTx<'a> {
                     );
 
                     let (_, cleanups) = db
-                        .run_query(
-                            self,
-                            program,
-                            cur_vld,
-                            callback_collector,
-                            false,
-                        )
+                        .run_query(self, program, cur_vld, callback_collector, false)
                         .map_err(|err| {
                             if err.source_code().is_some() {
                                 err

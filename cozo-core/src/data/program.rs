@@ -1303,7 +1303,9 @@ impl SearchInput {
         gen: &mut TempSymbGen,
     ) -> Result<Disjunction> {
         let mut conj = Vec::with_capacity(8);
-        let mut bindings = Vec::with_capacity(base_handle.metadata.keys.len() + base_handle.metadata.non_keys.len());
+        let mut bindings = Vec::with_capacity(
+            base_handle.metadata.keys.len() + base_handle.metadata.non_keys.len(),
+        );
         let mut seen_variables = BTreeSet::new();
 
         // Bind every column of the base relation (keys + non_keys).
@@ -1325,7 +1327,10 @@ impl SearchInput {
                             let kw = gen.next(span);
                             let unif = NormalFormAtom::Unification(Unification {
                                 binding: kw.clone(),
-                                expr: Expr::Binding { var, tuple_pos: None },
+                                expr: Expr::Binding {
+                                    var,
+                                    tuple_pos: None,
+                                },
                                 one_many_unif: false,
                                 span,
                             });
@@ -1353,10 +1358,17 @@ impl SearchInput {
 
         // Pull `query` — must be a literal string for v1.
         let query_expr = self.parameters.remove("query").ok_or_else(|| {
-            miette::miette!("`~{}:{}` search requires a `query` parameter", self.relation, self.index)
+            miette::miette!(
+                "`~{}:{}` search requires a `query` parameter",
+                self.relation,
+                self.index
+            )
         })?;
         let query = match query_expr {
-            Expr::Const { val: DataValue::Str(s), .. } => s.to_string(),
+            Expr::Const {
+                val: DataValue::Str(s),
+                ..
+            } => s.to_string(),
             other => bail!(
                 "`~{}:{}` expects `query` to be a string literal, got {:?}",
                 self.relation,
@@ -1367,10 +1379,17 @@ impl SearchInput {
 
         // Pull `k` — must be a non-negative integer literal.
         let k_expr = self.parameters.remove("k").ok_or_else(|| {
-            miette::miette!("`~{}:{}` search requires a `k` parameter", self.relation, self.index)
+            miette::miette!(
+                "`~{}:{}` search requires a `k` parameter",
+                self.relation,
+                self.index
+            )
         })?;
         let k = match k_expr {
-            Expr::Const { val: DataValue::Num(n), .. } => {
+            Expr::Const {
+                val: DataValue::Num(n),
+                ..
+            } => {
                 let v = n.get_int().unwrap_or(-1);
                 if v < 0 {
                     bail!("`k` must be a non-negative integer");
@@ -1398,7 +1417,10 @@ impl SearchInput {
         };
 
         if !self.parameters.is_empty() {
-            bail!("Unexpected parameters for FTS search: {:?}", self.parameters);
+            bail!(
+                "Unexpected parameters for FTS search: {:?}",
+                self.parameters
+            );
         }
 
         conj.push(NormalFormAtom::FtsSearch(FtsSearch {

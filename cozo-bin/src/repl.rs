@@ -81,11 +81,7 @@ where
     let db_copy = db.clone();
     ctrlc::set_handler(move || {
         let running = db_copy
-            .run_script(
-                "::running",
-                BTreeMap::new(),
-                ScriptMutability::Mutable,
-            )
+            .run_script("::running", BTreeMap::new(), ScriptMutability::Mutable)
             .expect("Cannot determine running queries");
         for row in running.rows {
             let id = row.into_iter().next().unwrap();
@@ -285,9 +281,9 @@ where
                         .ok_or_else(|| miette!("'{rel_name}' is missing a 'headers' array"))?
                         .iter()
                         .map(|h| {
-                            h.as_str().map(str::to_string).ok_or_else(|| {
-                                miette!("'{rel_name}.headers' must be strings")
-                            })
+                            h.as_str()
+                                .map(str::to_string)
+                                .ok_or_else(|| miette!("'{rel_name}.headers' must be strings"))
                         })
                         .collect::<Result<Vec<_>, _>>()?;
                     let rows = rel_value
