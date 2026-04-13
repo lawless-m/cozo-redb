@@ -10,6 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use miette::{bail, IntoDiagnostic, Result};
+use redb::backends::InMemoryBackend;
 use redb::{
     Database, ReadTransaction, ReadableDatabase, ReadableTable, TableDefinition, WriteTransaction,
 };
@@ -26,6 +27,22 @@ const TABLE: TableDefinition<'_, &[u8], &[u8]> = TableDefinition::new("cozo");
 pub fn new_cozo_redb(path: impl AsRef<Path>) -> Result<crate::Db<RedbStorage>> {
     let path_buf = path.as_ref().to_path_buf();
     let db = Database::create(path).into_diagnostic()?;
+    finish_redb(db, path_buf)
+}
+
+/// Creates a redb database object backed by an in-memory store, with no host
+/// filesystem or mmap involvement. Intended for WASM embeddings and tests.
+pub fn new_cozo_redb_mem() -> Result<crate::Db<RedbStorage>> {
+    let db = Database::builder()
+        .create_with_backend(InMemoryBackend::new())
+        .into_diagnostic()?;
+    finish_redb(db, std::path::PathBuf::new())
+}
+
+fn finish_redb(
+    db: Database,
+    path_buf: std::path::PathBuf,
+) -> Result<crate::Db<RedbStorage>> {
     {
         let tx = db.begin_write().into_diagnostic()?;
         tx.open_table(TABLE).into_diagnostic()?;

@@ -44,7 +44,7 @@ pub use runtime::relation::decode_tuple_from_kv;
 pub use runtime::temp_store::RegularTempStore;
 pub use storage::mem::{new_cozo_mem, MemStorage};
 #[cfg(feature = "storage-redb")]
-pub use storage::re::{new_cozo_redb, RedbStorage};
+pub use storage::re::{new_cozo_redb, new_cozo_redb_mem, RedbStorage};
 pub use storage::{Storage, StoreTx};
 
 pub use crate::data::expr::Expr;
