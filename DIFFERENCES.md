@@ -68,14 +68,6 @@ Upstream offered a MinHash-LSH index for approximate set similarity. This
 fork removed it entirely. Upstream pages describing MinHash-LSH do not apply
 here.
 
-## Not a labelled-property graph database
-
-`cozo-redb` is **not** a labelled-property graph database. There are no
-nodes-and-edges primitives — model your data as relations, and the graph is
-whatever the relations describe. (This is inherited from upstream, but worth
-stating for readers arriving from Neo4j or similar tools that expect
-otherwise.)
-
 ## What was added
 
 * A pure-Rust `redb` storage backend with time travel.

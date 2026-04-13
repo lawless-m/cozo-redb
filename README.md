@@ -59,6 +59,10 @@ SQL can express them, but recursive traversals are awkward and slow.
 Datalog, which handles recursion natively — shortest-path, reachability,
 and PageRank are one query, not twenty.
 
+This is **not** a labelled-property graph database. There are no
+nodes-and-edges primitives. Model your data as relations; the graph is
+whatever the relations describe.
+
 ### Why Datalog
 
 Queries are composed from named rules, not nested subqueries. Recursion
