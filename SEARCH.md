@@ -1,9 +1,13 @@
 # Full-Text Search
 
 cozo-redb ships full-text search via [tantivy](https://github.com/quickwit-oss/tantivy),
-enabled by the `fts` Cargo feature (on by default with `compact`). This document
-covers the user-facing CozoScript syntax; for internals see
-`cozo-core/src/fts/mod.rs`.
+enabled by the `fts` Cargo feature. The default `compact` feature set pulls
+in `fts-mmap`, which uses an on-disk tantivy directory next to the redb file
+and is the right choice for native embeddings. The plain `fts` feature uses
+an in-RAM tantivy index instead — slower to warm up because every database
+open rebuilds the index, but it has no filesystem dependencies and is the
+mode used by the WASM build. This document covers the user-facing
+CozoScript syntax; for internals see `cozo-core/src/fts/mod.rs`.
 
 ## Creating an index
 
@@ -24,7 +28,8 @@ indexed without scrubbing the schema.
 
 ### Sidecar layout
 
-The tantivy directory lives next to the redb file:
+With the `fts-mmap` feature (the native default), the tantivy directory
+lives next to the redb file:
 
 ```
 my.db
@@ -32,6 +37,11 @@ my.db.ft/<relation>/<index>/
 ```
 
 Backups: close the database, then copy both `my.db` and `my.db.ft/` together.
+
+With the plain `fts` feature (the WASM build, or `default-features = false,
+features = ["fts"]`), there is no sidecar — the tantivy index is held in
+RAM and discarded when the `Db` is dropped. Reopening the database starts
+with an empty FTS index that needs to be repopulated.
 
 ## Searching
 

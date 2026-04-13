@@ -202,8 +202,11 @@ This fork targets Rust embedders.
   almost certainly what you want.
 * **Standalone binary** (`cozo-bin/`): CLI and REPL for ad-hoc queries against a
   redb database file. Build with `cargo build --release -p cozo-bin`.
-* **WebAssembly** (`cozo-lib-wasm/`): in-browser build. Currently being rebuilt; don't
-  rely on it.
+* **WebAssembly** (`cozo-lib-wasm/`): in-browser build via `wasm-pack`, exposing
+  a `CozoDb` JS class backed by `MemStorage`. Full-text search works in the
+  browser too, via an in-RAM tantivy index. See `cozo-lib-wasm/build.sh` —
+  cross-compiling the `zstd-sys` shim requires a wasm-capable clang
+  (`apt install clang-19` on Debian).
 
 ## Architecture
 

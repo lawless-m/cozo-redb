@@ -37,7 +37,8 @@ The Python, Node, Java, Swift, and C language bindings were removed. Upstream
 v0.7 still has them if you need them.
 
 This fork targets Rust embedders exclusively. The only non-Rust surface is
-`cozo-lib-wasm`, which is currently being rebuilt and not to be relied upon.
+`cozo-lib-wasm`, a `wasm-pack` build that exposes a `CozoDb` JS class over
+the in-memory storage backend, with optional in-RAM full-text search.
 
 ## No client-server mode
 

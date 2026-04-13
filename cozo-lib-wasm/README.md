@@ -45,7 +45,7 @@ export class CozoDb {
 
     static new(): CozoDb;
 
-    run(script: string, params: string): string;
+    run(script: string, params: string, immutable: boolean): string;
 
     export_relations(data: string): string;
 
@@ -65,19 +65,33 @@ The next section contains some pointers for how to alleviate this, but expect a 
 
 ## Compiling
 
-You will need to install [Rust](https://rustup.rs/), [NodeJS with npm](https://nodejs.org/),
-and [wasm-pack](https://github.com/rustwasm/wasm-pack) first.
+You will need [Rust](https://rustup.rs/),
+[wasm-pack](https://github.com/rustwasm/wasm-pack), and a wasm-capable
+clang (Debian: `apt install clang-19`). The clang dependency is forced
+by `zstd-sys`, which `tantivy-sstable` pulls in unconditionally and
+which compiles a small C shim under `wasm-shim/` when targeting
+`wasm32-unknown-unknown`.
 
-The published module was built with
+Then run:
 
 ```bash
-wasm-pack build --target web --release
+./build.sh
 ```
 
-and the environment variable `CARGO_PROFILE_RELEASE_LTO=fat`.
+`build.sh` defaults to `clang-19` and `llvm-ar-19`; override with the
+`CC_WASM` and `AR_WASM` environment variables if your binaries are
+named differently. The script is a thin wrapper around:
 
-The important option is `--target web`: the above usage instructions only work for this target.
-See the documentation [here](https://rustwasm.github.io/wasm-pack/book/commands/build.html#target).
+```bash
+CC_wasm32_unknown_unknown=clang-19 \
+AR_wasm32_unknown_unknown=llvm-ar-19 \
+CARGO_PROFILE_RELEASE_LTO=fat \
+    wasm-pack build --target web --release
+```
+
+The important option is `--target web`: the above usage instructions
+only work for this target. See the documentation
+[here](https://rustwasm.github.io/wasm-pack/book/commands/build.html#target).
 
 if you are interested in running Cozo in a web worker and expect it to run across browsers,
 you will need to use the `--target no-modules` option, and write a lot of gluing code.
