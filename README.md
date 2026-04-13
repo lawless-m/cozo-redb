@@ -14,6 +14,12 @@
 > the non-Rust language bindings are gone. For other notes, see
 > [DIFFERENCES.md](DIFFERENCES.md).
 >
+> If you have never met Cozo before and would like a walked-through explanation — what
+> Datalog is, how rules and stored relations fit together, why recursion is the whole
+> point, and what time travel, vector search, and full-text search look like in the
+> concrete — read [SERMON.md](SERMON.md). It is the in-depth introduction the cozo
+> lineage never quite got around to writing.
+>
 > No support commitment, no release cadence promise. MPL-2.0, PRs welcome.
 
 ### Table of contents
