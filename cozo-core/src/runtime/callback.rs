@@ -12,7 +12,7 @@ use smartstring::{LazyCompact, SmartString};
 
 use crate::NamedRows;
 
-/// The kind of mutation accumulated into a [`CallbackCollector`].
+/// The kind of mutation reported for a row affected by a write.
 ///
 /// Historically this was used to notify registered callbacks of changes to a
 /// relation. That callback machinery was removed; the enum is kept because
