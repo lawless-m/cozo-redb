@@ -353,13 +353,13 @@ impl Expr {
         }
         Ok(())
     }
-    #[allow(dead_code)]
+    #[cfg(feature = "graph-algo")]
     pub(crate) fn binding_indices(&self) -> Result<BTreeSet<usize>> {
         let mut ret = BTreeSet::default();
         self.do_binding_indices(&mut ret)?;
         Ok(ret)
     }
-    #[allow(dead_code)]
+    #[cfg(feature = "graph-algo")]
     fn do_binding_indices(&self, coll: &mut BTreeSet<usize>) -> Result<()> {
         match self {
             Expr::Binding { tuple_pos, .. } => {

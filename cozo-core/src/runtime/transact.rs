@@ -61,7 +61,7 @@ impl<'a> SessionTx<'a> {
                     vec![vec![DataValue::from(OK_STR)]],
                 ),
                 ReturnMutation::Returning => {
-                    let meta = self.get_relation(rel, false)?;
+                    let meta = self.get_relation(rel)?;
                     let target_len = meta.metadata.keys.len() + meta.metadata.non_keys.len();
                     let mut returned_rows = Vec::new();
                     if let Some(collected) = callback_collector.get(&meta.name) {
@@ -108,7 +108,7 @@ impl<'a> SessionTx<'a> {
     pub(crate) fn init_storage(&mut self) -> Result<RelationId> {
         let tuple = vec![DataValue::Null];
         let t_encoded = tuple.encode_as_key(RelationId::SYSTEM);
-        let found = self.store_tx.get(&t_encoded, false)?;
+        let found = self.store_tx.get(&t_encoded)?;
         let storage_version_key = storage_version_key();
         let ret = match found {
             None => {
@@ -119,7 +119,7 @@ impl<'a> SessionTx<'a> {
                 RelationId::SYSTEM
             }
             Some(slice) => {
-                let version_found = self.store_tx.get(&storage_version_key, false)?;
+                let version_found = self.store_tx.get(&storage_version_key)?;
                 match version_found {
                     None => {
                         bail!("Storage is used but un-versioned, probably created by an ancient version of Cozo.")

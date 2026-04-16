@@ -34,10 +34,8 @@ pub trait Storage<'s>: Send + Sync + Clone {
 /// Trait for the associated transaction type of a storage engine.
 /// A transaction needs to guarantee MVCC semantics for all operations.
 pub trait StoreTx<'s>: Sync {
-    /// Get a key. If `for_update` is `true` (only possible in a write transaction),
-    /// then the database needs to guarantee that `commit()` can only succeed if
-    /// the key has not been modified outside the transaction.
-    fn get(&self, key: &[u8], for_update: bool) -> Result<Option<Vec<u8>>>;
+    /// Get a key.
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     /// Put a key-value pair into the storage. In case of existing key,
     /// the storage engine needs to overwrite the old value.
@@ -49,10 +47,8 @@ pub trait StoreTx<'s>: Sync {
     /// Delete a range from persisted data only.
     fn del_range_from_persisted(&mut self, lower: &[u8], upper: &[u8]) -> Result<()>;
 
-    /// Check if a key exists. If `for_update` is `true` (only possible in a write transaction),
-    /// then the database needs to guarantee that `commit()` can only succeed if
-    /// the key has not been modified outside the transaction.
-    fn exists(&self, key: &[u8], for_update: bool) -> Result<bool>;
+    /// Check if a key exists.
+    fn exists(&self, key: &[u8]) -> Result<bool>;
 
     /// Commit a transaction. Must return an `Err` if MVCC consistency cannot be guaranteed,
     /// and discard all changes introduced by this transaction.

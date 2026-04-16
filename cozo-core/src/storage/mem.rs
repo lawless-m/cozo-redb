@@ -68,7 +68,7 @@ pub enum MemTx<'s> {
 }
 
 impl<'s> StoreTx<'s> for MemTx<'s> {
-    fn get(&self, key: &[u8], _for_update: bool) -> Result<Option<Vec<u8>>> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(match self {
             MemTx::Reader(rdr) => rdr.get(key).cloned(),
             MemTx::Writer(wtr, cache) => match cache.get(key) {
@@ -121,7 +121,7 @@ impl<'s> StoreTx<'s> for MemTx<'s> {
         Ok(())
     }
 
-    fn exists(&self, key: &[u8], _for_update: bool) -> Result<bool> {
+    fn exists(&self, key: &[u8]) -> Result<bool> {
         Ok(match self {
             MemTx::Reader(rdr) => rdr.contains_key(key),
             MemTx::Writer(wtr, cache) => match cache.get(key) {

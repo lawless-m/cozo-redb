@@ -39,7 +39,7 @@ pub(crate) struct TempTx {
 }
 
 impl<'s> StoreTx<'s> for TempTx {
-    fn get(&self, key: &[u8], _for_update: bool) -> Result<Option<Vec<u8>>> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.store.get(key).cloned())
     }
 
@@ -57,7 +57,7 @@ impl<'s> StoreTx<'s> for TempTx {
         Ok(())
     }
 
-    fn exists(&self, key: &[u8], _for_update: bool) -> Result<bool> {
+    fn exists(&self, key: &[u8]) -> Result<bool> {
         Ok(self.store.contains_key(key))
     }
 

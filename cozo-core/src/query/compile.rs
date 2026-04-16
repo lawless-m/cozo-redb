@@ -217,7 +217,7 @@ impl<'a> SessionTx<'a> {
                     ret = ret.join(right, prev_joiner_vars, right_joiner_vars, rule_app.span);
                 }
                 MagicAtom::Relation(rel_app) => {
-                    let store = self.get_relation(&rel_app.name, false)?;
+                    let store = self.get_relation(&rel_app.name)?;
                     if store.access_level < AccessLevel::ReadOnly {
                         bail!(InsufficientAccessLevel(
                             store.name.to_string(),
@@ -411,7 +411,7 @@ impl<'a> SessionTx<'a> {
                     ret = ret.neg_join(right, prev_joiner_vars, right_joiner_vars, rule_app.span);
                 }
                 MagicAtom::NegatedRelation(rel_app) => {
-                    let store = self.get_relation(&rel_app.name, false)?;
+                    let store = self.get_relation(&rel_app.name)?;
                     ensure!(
                         store.arity() == rel_app.args.len(),
                         ArityMismatch(

@@ -12,7 +12,7 @@ use std::iter;
 
 use either::{Left, Right};
 use itertools::Itertools;
-use log::{debug, error};
+use log::debug;
 use miette::{bail, Diagnostic, Result};
 use thiserror::Error;
 
@@ -991,7 +991,7 @@ impl FtsSearchRA {
                     // `encode_key_for_store` would have produced.
                     let mut full_key = base.id.raw_encode().to_vec();
                     full_key.extend_from_slice(key_bytes);
-                    let Some(raw_val) = tx.store_tx.get(&full_key, false)? else {
+                    let Some(raw_val) = tx.store_tx.get(&full_key)? else {
                         continue;
                     };
                     let decoded_key = crate::data::tuple::decode_tuple_from_key(&full_key, key_len);

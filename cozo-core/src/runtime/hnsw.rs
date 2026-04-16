@@ -328,7 +328,7 @@ impl<'a> SessionTx<'a> {
                     }
                     let target_self_key_bytes =
                         idx_table.encode_key_for_store(&target_self_key, Default::default())?;
-                    let target_self_val_bytes = match self.store_tx.get(&target_self_key_bytes, false)? {
+                    let target_self_val_bytes = match self.store_tx.get(&target_self_key_bytes)? {
                         Some(bytes) => bytes,
                         None => bail!("Indexed vector not found, this signifies a bug in the index implementation"),
                     };
@@ -442,7 +442,7 @@ impl<'a> SessionTx<'a> {
                 old_key.push(DataValue::from(old.1 as i64));
                 old_key.push(DataValue::from(old.2 as i64));
                 let old_key_bytes = idx_table.encode_key_for_store(&old_key, Default::default())?;
-                let old_existing_val = match self.store_tx.get(&old_key_bytes, false)? {
+                let old_existing_val = match self.store_tx.get(&old_key_bytes)? {
                     Some(bytes) => bytes,
                     None => {
                         bail!("Indexed vector not found, this signifies a bug in the index implementation")
@@ -771,7 +771,7 @@ impl<'a> SessionTx<'a> {
                 self_key.push(DataValue::from(subidx as i64));
             }
             let self_key_bytes = idx_table.encode_key_for_store(&self_key, Default::default())?;
-            if self.store_tx.exists(&self_key_bytes, false)? {
+            if self.store_tx.exists(&self_key_bytes)? {
                 self.store_tx.del(&self_key_bytes)?;
             } else {
                 break;
@@ -810,10 +810,7 @@ impl<'a> SessionTx<'a> {
                 }
                 let neighbour_val_bytes = self
                     .store_tx
-                    .get(
-                        &idx_table.encode_key_for_store(&neighbour_self_key, Default::default())?,
-                        false,
-                    )?
+                    .get(&idx_table.encode_key_for_store(&neighbour_self_key, Default::default())?)?
                     .unwrap();
                 let mut neighbour_val: Vec<DataValue> =
                     rmp_serde::from_slice(&neighbour_val_bytes[ENCODED_KEY_MIN_LEN..]).unwrap();

@@ -92,7 +92,7 @@ impl<'a, 'b> FixedRuleInputRelation<'a, 'b> {
                 Box::new(store.all_iter().map(|t| Ok(t.into_tuple())))
             }
             MagicFixedRuleRuleArg::Stored { name, valid_at, .. } => {
-                let relation = self.tx.get_relation(name, false)?;
+                let relation = self.tx.get_relation(name)?;
                 if let Some(valid_at) = valid_at {
                     Box::new(relation.skip_scan_all(self.tx, *valid_at))
                 } else {
@@ -112,7 +112,7 @@ impl<'a, 'b> FixedRuleInputRelation<'a, 'b> {
                 Box::new(store.prefix_iter(&t).map(|t| Ok(t.into_tuple())))
             }
             MagicFixedRuleRuleArg::Stored { name, valid_at, .. } => {
-                let relation = self.tx.get_relation(name, false)?;
+                let relation = self.tx.get_relation(name)?;
                 let t = vec![prefix.clone()];
                 if let Some(valid_at) = valid_at {
                     Box::new(relation.skip_scan_prefix(self.tx, &t, *valid_at))
@@ -843,12 +843,14 @@ impl FixedRuleHandle {
     }
 }
 
+#[cfg(feature = "graph-algo")]
 #[derive(Error, Diagnostic, Debug)]
 #[error("The relation cannot be interpreted as an edge")]
 #[diagnostic(code(algo::not_an_edge))]
 #[diagnostic(help("Edge relation requires tuples of length at least two"))]
 struct NotAnEdgeError(#[label] SourceSpan);
 
+#[cfg(feature = "graph-algo")]
 #[derive(Error, Diagnostic, Debug)]
 #[error(
     "The value {0:?} at the third position in the relation cannot be interpreted as edge weights"
@@ -864,6 +866,7 @@ struct BadEdgeWeightError(DataValue, #[label] SourceSpan);
 #[diagnostic(code(algo::rule_not_found))]
 struct RuleNotFoundError(String, #[label] SourceSpan);
 
+#[cfg(feature = "graph-algo")]
 #[derive(Error, Diagnostic, Debug)]
 #[error("Required node with key {missing:?} not found")]
 #[diagnostic(code(algo::node_with_key_not_found))]
@@ -876,6 +879,7 @@ pub(crate) struct NodeNotFoundError {
     pub(crate) span: SourceSpan,
 }
 
+#[cfg(feature = "graph-algo")]
 #[derive(Error, Diagnostic, Debug)]
 #[error("Unacceptable value {0:?} encountered")]
 #[diagnostic(code(algo::unacceptable_value))]
@@ -904,7 +908,7 @@ impl MagicFixedRuleRuleArg {
                 store.arity
             }
             MagicFixedRuleRuleArg::Stored { name, .. } => {
-                let handle = tx.get_relation(name, false)?;
+                let handle = tx.get_relation(name)?;
                 handle.arity()
             }
         })

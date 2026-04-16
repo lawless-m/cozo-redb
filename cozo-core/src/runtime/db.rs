@@ -285,7 +285,7 @@ impl<'s, S: Storage<'s>> Db<S> {
         let tx = self.transact()?;
         let mut ret: BTreeMap<String, NamedRows> = BTreeMap::new();
         for rel in relations {
-            let handle = tx.get_relation(rel.as_ref(), false)?;
+            let handle = tx.get_relation(rel.as_ref())?;
             let size_hint = handle.metadata.keys.len() + handle.metadata.non_keys.len();
 
             if handle.access_level < AccessLevel::ReadOnly {
@@ -356,7 +356,7 @@ impl<'s, S: Storage<'s>> Db<S> {
             if relation.contains(':') {
                 bail!(ImportIntoIndex(relation.to_string()))
             }
-            let handle = tx.get_relation(relation, false)?;
+            let handle = tx.get_relation(relation)?;
             let has_indices = !handle.indices.is_empty();
 
             if handle.access_level < AccessLevel::Protected {
@@ -422,7 +422,7 @@ impl<'s, S: Storage<'s>> Db<S> {
                     .try_collect()?;
                 let k_store = handle.encode_key_for_store(&keys, Default::default())?;
                 if has_indices {
-                    if let Some(existing) = tx.store_tx.get(&k_store, false)? {
+                    if let Some(existing) = tx.store_tx.get(&k_store)? {
                         let mut old = keys.clone();
                         extend_tuple_from_v(&mut old, &existing);
                         if is_delete || old != row {
@@ -1000,7 +1000,7 @@ impl<'s, S: Storage<'s>> Db<S> {
                 })
             }
             SysOp::ShowTrigger(name) => {
-                let rel = tx.get_relation(name, false)?;
+                let rel = tx.get_relation(name)?;
                 let mut rows: Vec<Vec<JsonValue>> = vec![];
                 for (i, trigger) in rel.put_triggers.iter().enumerate() {
                     rows.push(vec![json!("put"), json!(i), json!(trigger)])
@@ -1084,7 +1084,7 @@ impl<'s, S: Storage<'s>> Db<S> {
                 #[diagnostic(code(eval::stored_relation_not_found))]
                 struct StoreRelationNotFoundError(String);
 
-                let existing = tx.get_relation(&meta.name, false)?;
+                let existing = tx.get_relation(&meta.name)?;
 
                 ensure!(
                     tx.relation_exists(&meta.name)?,
@@ -1302,7 +1302,7 @@ impl<'s, S: Storage<'s>> Db<S> {
         ))
     }
     fn list_indices(&'s self, tx: &SessionTx<'_>, name: &str) -> Result<NamedRows> {
-        let handle = tx.get_relation(name, false)?;
+        let handle = tx.get_relation(name)?;
         let mut rows = vec![];
         for (name, (rel, cols)) in &handle.indices {
             rows.push(vec![
@@ -1347,7 +1347,7 @@ impl<'s, S: Storage<'s>> Db<S> {
         ))
     }
     fn list_columns(&'s self, tx: &SessionTx<'_>, name: &str) -> Result<NamedRows> {
-        let handle = tx.get_relation(name, false)?;
+        let handle = tx.get_relation(name)?;
         let mut rows = vec![];
         let mut idx = 0;
         for col in &handle.metadata.keys {

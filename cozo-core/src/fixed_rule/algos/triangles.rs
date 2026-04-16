@@ -11,7 +11,6 @@ use std::collections::BTreeMap;
 use graph::prelude::{DirectedCsrGraph, DirectedNeighbors, Graph};
 use itertools::Itertools;
 use miette::Result;
-#[cfg(feature = "rayon")]
 use rayon::prelude::*;
 use smartstring::{LazyCompact, SmartString};
 

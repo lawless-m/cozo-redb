@@ -79,10 +79,18 @@ pub enum RedbTx {
     Write(Option<WriteTransaction>),
 }
 
+// SAFETY: redb's `WriteTransaction` is `Send` but not `Sync` because its
+// internal state is mutated when opening tables / performing writes. The
+// `StoreTx` trait requires `Sync` so the engine can hand a borrow across
+// threads during range scans, but every mutator in this impl takes
+// `&mut self`, and read-only methods only perform operations that redb
+// itself synchronises internally (table opens take a shared lock). We
+// never expose a shared reference to the inner `WriteTransaction` across
+// threads in a way that races with mutation, so this impl is sound.
 unsafe impl Sync for RedbTx {}
 
 impl<'s> StoreTx<'s> for RedbTx {
-    fn get(&self, key: &[u8], _for_update: bool) -> Result<Option<Vec<u8>>> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         match self {
             RedbTx::Read(tx) => {
                 let table = tx.open_table(TABLE).into_diagnostic()?;
@@ -93,6 +101,10 @@ impl<'s> StoreTx<'s> for RedbTx {
             }
             RedbTx::Write(Some(tx)) => {
                 let table = tx.open_table(TABLE).into_diagnostic()?;
+                // NOTE: bind to a local before returning so `table`'s
+                // `AccessGuard` drops before the `Ok(...)` wrap; collapsing
+                // this into a single expression extends the borrow and fails
+                // to compile (see E0597).
                 let result = table
                     .get(key)
                     .into_diagnostic()?
@@ -141,7 +153,7 @@ impl<'s> StoreTx<'s> for RedbTx {
         }
     }
 
-    fn exists(&self, key: &[u8], _for_update: bool) -> Result<bool> {
+    fn exists(&self, key: &[u8]) -> Result<bool> {
         match self {
             RedbTx::Read(tx) => {
                 let table = tx.open_table(TABLE).into_diagnostic()?;
@@ -149,6 +161,8 @@ impl<'s> StoreTx<'s> for RedbTx {
             }
             RedbTx::Write(Some(tx)) => {
                 let table = tx.open_table(TABLE).into_diagnostic()?;
+                // NOTE: see `get()` — the intermediate binding forces
+                // `table`'s `AccessGuard` to drop before `Ok` wraps the bool.
                 let result = table.get(key).into_diagnostic()?.is_some();
                 Ok(result)
             }
@@ -193,6 +207,15 @@ impl<'s> StoreTx<'s> for RedbTx {
                 }))
             }
             RedbTx::Write(Some(tx)) => {
+                // NOTE: we materialise into a Vec here rather than streaming.
+                // `tx.open_table()` returns a `Table<'_>` borrowing from the
+                // write transaction, and `Table::range()` in turn borrows from
+                // that table. Streaming would require a self-referential
+                // struct holding both `&WriteTransaction`, `Table<'_>` and the
+                // range iterator — not expressible with plain lifetimes, and
+                // not worth pulling in `ouroboros` for a path that's only hit
+                // on in-transaction scans (e.g. mid-write deletions). Reads on
+                // the Read branch do stream.
                 let table = match tx.open_table(TABLE) {
                     Ok(t) => t,
                     Err(e) => return Box::new(std::iter::once(Err(miette::miette!("{e}")))),

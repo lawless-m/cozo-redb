@@ -8,21 +8,13 @@
  */
 
 use std::collections::BTreeMap;
-use std::time::Duration;
 
 use itertools::Itertools;
 use log::debug;
 use serde_json::json;
-use smartstring::{LazyCompact, SmartString};
 
-use crate::data::expr::Expr;
-use crate::data::symb::Symbol;
 use crate::data::value::DataValue;
-use crate::fixed_rule::FixedRulePayload;
-use crate::parse::SourceSpan;
-use crate::runtime::callback::CallbackOp;
-use crate::runtime::db::Poison;
-use crate::{new_cozo_mem, FixedRule, RegularTempStore, ScriptMutability};
+use crate::{new_cozo_mem, ScriptMutability};
 
 #[test]
 fn test_limit_offset() {

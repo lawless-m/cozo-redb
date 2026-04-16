@@ -350,7 +350,7 @@ impl NormalFormProgram {
                                                 valid_at,
                                             } => {
                                                 if valid_at.is_some() {
-                                                    let relation = tx.get_relation(name, false)?;
+                                                    let relation = tx.get_relation(name)?;
                                                     let last_col_type = &relation
                                                         .metadata
                                                         .keys
@@ -383,7 +383,7 @@ impl NormalFormProgram {
                                                 valid_at,
                                                 span,
                                             } => {
-                                                let relation = tx.get_relation(name, false)?;
+                                                let relation = tx.get_relation(name)?;
                                                 if valid_at.is_some() {
                                                     let last_col_type = &relation
                                                         .metadata

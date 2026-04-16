@@ -29,7 +29,6 @@ use crate::runtime::hnsw::HnswIndexManifest;
 use crate::runtime::relation::{
     AccessLevel, InputRelationHandle, InsufficientAccessLevel, RelationHandle,
 };
-use crate::runtime::temp_store::EpochStore;
 use crate::runtime::transact::SessionTx;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -309,28 +308,6 @@ pub(crate) struct WrongFixedRuleOptionError {
 }
 
 impl MagicFixedRuleApply {
-    #[allow(dead_code)]
-    pub(crate) fn relation_with_min_len(
-        &self,
-        idx: usize,
-        len: usize,
-        tx: &SessionTx<'_>,
-        stores: &BTreeMap<MagicSymbol, EpochStore>,
-    ) -> Result<&MagicFixedRuleRuleArg> {
-        #[derive(Error, Diagnostic, Debug)]
-        #[error("Input relation to fixed rule has insufficient arity")]
-        #[diagnostic(help("Arity should be at least {0} but is {1}"))]
-        #[diagnostic(code(fixed_rule::input_relation_bad_arity))]
-        struct InputRelationArityError(usize, usize, #[label] SourceSpan);
-
-        let rel = self.relation(idx)?;
-        let arity = rel.arity(tx, stores)?;
-        ensure!(
-            arity >= len,
-            InputRelationArityError(len, arity, rel.span())
-        );
-        Ok(rel)
-    }
     pub(crate) fn relations_count(&self) -> usize {
         self.rule_args.len()
     }
@@ -433,14 +410,12 @@ pub(crate) enum MagicFixedRuleRuleArg {
 }
 
 impl MagicFixedRuleRuleArg {
-    #[allow(dead_code)]
     pub(crate) fn bindings(&self) -> &[Symbol] {
         match self {
             MagicFixedRuleRuleArg::InMem { bindings, .. }
             | MagicFixedRuleRuleArg::Stored { bindings, .. } => bindings,
         }
     }
-    #[allow(dead_code)]
     pub(crate) fn span(&self) -> SourceSpan {
         match self {
             MagicFixedRuleRuleArg::InMem { span, .. }
@@ -1258,7 +1233,7 @@ impl SearchInput {
         gen: &mut TempSymbGen,
         tx: &SessionTx<'_>,
     ) -> Result<Disjunction> {
-        let base_handle = tx.get_relation(&self.relation, false)?;
+        let base_handle = tx.get_relation(&self.relation)?;
         if base_handle.access_level < AccessLevel::ReadOnly {
             bail!(InsufficientAccessLevel(
                 base_handle.name.to_string(),

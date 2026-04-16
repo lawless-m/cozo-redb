@@ -192,11 +192,6 @@ impl RelationHandle {
         );
         Ok(NamedRows::new(headers, rows))
     }
-    #[allow(dead_code)]
-    pub(crate) fn amend_key_prefix(&self, data: &mut [u8]) {
-        let prefix_bytes = self.id.0.to_be_bytes();
-        data[0..8].copy_from_slice(&prefix_bytes);
-    }
     pub(crate) fn choose_index(
         &self,
         arg_uses: &[IndexPositionUse],
@@ -384,12 +379,12 @@ impl RelationHandle {
         if self.is_temp {
             Ok(tx
                 .temp_store_tx
-                .get(&key_data, false)?
+                .get(&key_data)?
                 .map(|val_data| decode_tuple_from_kv(&key_data, &val_data, Some(self.arity()))))
         } else {
             Ok(tx
                 .store_tx
-                .get(&key_data, false)?
+                .get(&key_data)?
                 .map(|val_data| decode_tuple_from_kv(&key_data, &val_data, Some(self.arity()))))
         }
     }
@@ -514,9 +509,9 @@ impl<'a> SessionTx<'a> {
         let key = DataValue::from(name);
         let encoded = vec![key].encode_as_key(RelationId::SYSTEM);
         if name.starts_with('_') {
-            self.temp_store_tx.exists(&encoded, false)
+            self.temp_store_tx.exists(&encoded)
         } else {
-            self.store_tx.exists(&encoded, false)
+            self.store_tx.exists(&encoded)
         }
     }
     pub(crate) fn set_relation_triggers(
@@ -529,7 +524,7 @@ impl<'a> SessionTx<'a> {
         if name.name.starts_with('_') {
             bail!("Cannot set triggers for temp store")
         }
-        let mut original = self.get_relation(name, true)?;
+        let mut original = self.get_relation(name)?;
         if original.access_level < AccessLevel::Protected {
             bail!(InsufficientAccessLevel(
                 original.name.to_string(),
@@ -562,10 +557,10 @@ impl<'a> SessionTx<'a> {
         let is_temp = input_meta.name.is_temp_store_name();
 
         if is_temp {
-            if self.store_tx.exists(&encoded, true)? {
+            if self.store_tx.exists(&encoded)? {
                 bail!(RelNameConflictError(input_meta.name.to_string()))
             };
-        } else if self.temp_store_tx.exists(&encoded, true)? {
+        } else if self.temp_store_tx.exists(&encoded)? {
             bail!(RelNameConflictError(input_meta.name.to_string()))
         }
 
@@ -610,7 +605,7 @@ impl<'a> SessionTx<'a> {
 
         Ok(meta)
     }
-    pub(crate) fn get_relation(&self, name: &str, lock: bool) -> Result<RelationHandle> {
+    pub(crate) fn get_relation(&self, name: &str) -> Result<RelationHandle> {
         #[derive(Error, Diagnostic, Debug)]
         #[error("Cannot find requested stored relation '{0}'")]
         #[diagnostic(code(query::relation_not_found))]
@@ -621,18 +616,18 @@ impl<'a> SessionTx<'a> {
 
         let found = if name.starts_with('_') {
             self.temp_store_tx
-                .get(&encoded, lock)?
+                .get(&encoded)?
                 .ok_or_else(|| StoredRelationNotFoundError(name.to_string()))?
         } else {
             self.store_tx
-                .get(&encoded, lock)?
+                .get(&encoded)?
                 .ok_or_else(|| StoredRelationNotFoundError(name.to_string()))?
         };
         let metadata = RelationHandle::decode(&found)?;
         Ok(metadata)
     }
     pub(crate) fn describe_relation(&mut self, name: &str, description: &str) -> Result<()> {
-        let mut meta = self.get_relation(name, true)?;
+        let mut meta = self.get_relation(name)?;
 
         meta.description = SmartString::from(description);
         let name_key = vec![DataValue::Str(meta.name.clone())].encode_as_key(RelationId::SYSTEM);
@@ -654,7 +649,7 @@ impl<'a> SessionTx<'a> {
         // if name.starts_with('_') {
         //     bail!("Cannot destroy temp relation");
         // }
-        let store = self.get_relation(name, true)?;
+        let store = self.get_relation(name)?;
         if !store.has_no_index() {
             bail!(
                 "Cannot remove stored relation `{}` with indices attached.",
@@ -692,7 +687,7 @@ impl<'a> SessionTx<'a> {
         Ok(to_clean)
     }
     pub(crate) fn set_access_level(&mut self, rel: &Symbol, level: AccessLevel) -> Result<()> {
-        let mut meta = self.get_relation(rel, true)?;
+        let mut meta = self.get_relation(rel)?;
         meta.access_level = level;
 
         let name_key = vec![DataValue::Str(meta.name.clone())].encode_as_key(RelationId::SYSTEM);
@@ -717,7 +712,7 @@ impl<'a> SessionTx<'a> {
         config: &crate::parse::sys::FtsIndexConfig,
     ) -> Result<()> {
         use crate::fts::{value_as_indexable_text, FtsIndexManifest};
-        let mut rel_handle = self.get_relation(&config.base_relation, true)?;
+        let mut rel_handle = self.get_relation(&config.base_relation)?;
 
         if rel_handle.has_index(&config.index_name) {
             bail!(IndexAlreadyExists(
@@ -802,7 +797,7 @@ impl<'a> SessionTx<'a> {
 
     pub(crate) fn create_hnsw_index(&mut self, config: &HnswIndexConfig) -> Result<()> {
         // Get relation handle
-        let mut rel_handle = self.get_relation(&config.base_relation, true)?;
+        let mut rel_handle = self.get_relation(&config.base_relation)?;
 
         // Check if index already exists
         if rel_handle.has_index(&config.index_name) {
@@ -1029,7 +1024,7 @@ impl<'a> SessionTx<'a> {
         cols: &[Symbol],
     ) -> Result<()> {
         // Get relation handle
-        let mut rel_handle = self.get_relation(rel_name, true)?;
+        let mut rel_handle = self.get_relation(rel_name)?;
 
         // Check if index already exists
         if rel_handle.has_index(&idx_name.name) {
@@ -1153,7 +1148,7 @@ impl<'a> SessionTx<'a> {
         rel_name: &Symbol,
         idx_name: &Symbol,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        let mut rel = self.get_relation(rel_name, true)?;
+        let mut rel = self.get_relation(rel_name)?;
         let removed_plain = rel.indices.remove(&idx_name.name).is_some();
         let removed_hnsw = rel.hnsw_indices.remove(&idx_name.name).is_some();
         #[cfg(feature = "fts")]
@@ -1197,14 +1192,14 @@ impl<'a> SessionTx<'a> {
         let new_key = DataValue::Str(new.name.clone());
         let new_encoded = vec![new_key].encode_as_key(RelationId::SYSTEM);
 
-        if self.store_tx.exists(&new_encoded, true)? {
+        if self.store_tx.exists(&new_encoded)? {
             bail!(RelNameConflictError(new.name.to_string()))
         };
 
         let old_key = DataValue::Str(old.name.clone());
         let old_encoded = vec![old_key].encode_as_key(RelationId::SYSTEM);
 
-        let mut rel = self.get_relation(old, true)?;
+        let mut rel = self.get_relation(old)?;
         if rel.access_level < AccessLevel::Normal {
             bail!(InsufficientAccessLevel(
                 rel.name.to_string(),
@@ -1225,14 +1220,14 @@ impl<'a> SessionTx<'a> {
         let new_key = DataValue::Str(new.name.clone());
         let new_encoded = vec![new_key].encode_as_key(RelationId::SYSTEM);
 
-        if self.temp_store_tx.exists(&new_encoded, true)? {
+        if self.temp_store_tx.exists(&new_encoded)? {
             bail!(RelNameConflictError(new.name.to_string()))
         };
 
         let old_key = DataValue::Str(old.name.clone());
         let old_encoded = vec![old_key].encode_as_key(RelationId::SYSTEM);
 
-        let mut rel = self.get_relation(&old, true)?;
+        let mut rel = self.get_relation(&old)?;
         rel.name = new.name;
 
         let mut meta_val = vec![];

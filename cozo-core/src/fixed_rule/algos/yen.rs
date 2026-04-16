@@ -11,7 +11,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use graph::prelude::{DirectedCsrGraph, DirectedNeighborsWithValues};
 use itertools::Itertools;
 use miette::Result;
-#[cfg(feature = "rayon")]
 use rayon::prelude::*;
 use smartstring::{LazyCompact, SmartString};
 
@@ -81,7 +80,6 @@ impl FixedRule for KShortestPathYen {
             let first_it = starting_nodes
                 .iter()
                 .flat_map(|start| termination_nodes.iter().map(|goal| (*start, *goal)));
-            #[cfg(feature = "rayon")]
             let first_it = first_it.par_bridge();
 
             let res_all: Vec<_> = first_it

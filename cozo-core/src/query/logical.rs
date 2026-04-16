@@ -145,7 +145,7 @@ impl InputAtom {
         gen: &mut TempSymbGen,
         tx: &SessionTx<'_>,
     ) -> Result<InputRelationApplyAtom> {
-        let stored = tx.get_relation(&name, false)?;
+        let stored = tx.get_relation(&name)?;
         let fields: BTreeSet<_> = stored
             .metadata
             .keys

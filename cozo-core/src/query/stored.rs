@@ -56,7 +56,7 @@ impl<'a> SessionTx<'a> {
                 struct ReplaceInTrigger(String);
                 bail!(ReplaceInTrigger(meta.name.to_string()))
             }
-            if let Ok(old_handle) = self.get_relation(&meta.name, true) {
+            if let Ok(old_handle) = self.get_relation(&meta.name) {
                 if !old_handle.indices.is_empty() {
                     #[derive(Debug, Error, Diagnostic)]
                     #[error("cannot replace relation {0} since it has indices")]
@@ -103,7 +103,7 @@ impl<'a> SessionTx<'a> {
         let mut relation_store = if op == RelationOp::Replace || op == RelationOp::Create {
             self.create_relation(meta.clone())?
         } else {
-            self.get_relation(&meta.name, false)?
+            self.get_relation(&meta.name)?
         };
         if let Some((old_put, old_retract)) = replaced_old_triggers {
             relation_store.put_triggers = old_put;
@@ -263,9 +263,9 @@ impl<'a> SessionTx<'a> {
 
             if is_insert {
                 let already_exists = if relation_store.is_temp {
-                    self.temp_store_tx.exists(&key, true)?
+                    self.temp_store_tx.exists(&key)?
                 } else {
-                    self.store_tx.exists(&key, true)?
+                    self.store_tx.exists(&key)?
                 };
 
                 if already_exists {
@@ -280,7 +280,7 @@ impl<'a> SessionTx<'a> {
             let val = relation_store.encode_val_for_store(&extracted, span)?;
 
             if need_to_collect || has_indices || has_hnsw_indices || has_fts_indices {
-                if let Some(existing) = self.store_tx.get(&key, false)? {
+                if let Some(existing) = self.store_tx.get(&key)? {
                     let mut tup = extracted[0..relation_store.metadata.keys.len()].to_vec();
                     extend_tuple_from_v(&mut tup, &existing);
                     if has_indices && extracted != tup {
@@ -499,9 +499,9 @@ impl<'a> SessionTx<'a> {
 
             let key = relation_store.encode_key_for_store(&new_kv, span)?;
             let original_val_bytes = if relation_store.is_temp {
-                self.temp_store_tx.get(&key, true)?
+                self.temp_store_tx.get(&key)?
             } else {
-                self.store_tx.get(&key, true)?
+                self.store_tx.get(&key)?
             };
             let original_val: Tuple = match original_val_bytes {
                 None => {
@@ -725,9 +725,9 @@ impl<'a> SessionTx<'a> {
                 .try_collect()?;
             let key = relation_store.encode_key_for_store(&extracted, span)?;
             let already_exists = if relation_store.is_temp {
-                self.temp_store_tx.exists(&key, true)?
+                self.temp_store_tx.exists(&key)?
             } else {
-                self.store_tx.exists(&key, true)?
+                self.store_tx.exists(&key)?
             };
             if already_exists {
                 bail!(TransactAssertionFailure {
@@ -783,9 +783,9 @@ impl<'a> SessionTx<'a> {
             let val = relation_store.encode_val_for_store(&extracted, span)?;
 
             let existing = if relation_store.is_temp {
-                self.temp_store_tx.get(&key, true)?
+                self.temp_store_tx.get(&key)?
             } else {
-                self.store_tx.get(&key, true)?
+                self.store_tx.get(&key)?
             };
             match existing {
                 None => {
@@ -862,9 +862,9 @@ impl<'a> SessionTx<'a> {
             let key = relation_store.encode_key_for_store(&extracted, span)?;
             if check_exists {
                 let exists = if relation_store.is_temp {
-                    self.temp_store_tx.exists(&key, false)?
+                    self.temp_store_tx.exists(&key)?
                 } else {
-                    self.store_tx.exists(&key, false)?
+                    self.store_tx.exists(&key)?
                 };
                 if !exists {
                     bail!(TransactAssertionFailure {
@@ -875,7 +875,7 @@ impl<'a> SessionTx<'a> {
                 }
             }
             if need_to_collect || has_indices || has_hnsw_indices || has_fts_indices {
-                if let Some(existing) = self.store_tx.get(&key, false)? {
+                if let Some(existing) = self.store_tx.get(&key)? {
                     let mut tup = extracted.clone();
                     extend_tuple_from_v(&mut tup, &existing);
                     if has_indices {
